@@ -1,7 +1,7 @@
 {
-  "name": "ogar3",
+  "name": "blobz",
   "version": "1.0.0",
-  "description": "Open source Agar.io server",
+  "description": "Blobz browser arena game base",
   "main": "index.js",
   "dependencies": {
     "burrow": "0.0.0",
@@ -16,12 +16,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/forairan/Ogar"
+    "url": "git+https://github.com/beambotxyz-bit/Blobz.git"
   },
-  "author": "Devin Ryan <devin@forairan.com> (http://devin.codes/)",
+  "author": "Blobz Team",
   "license": "Apache License 2.0",
   "bugs": {
-    "url": "https://github.com/forairan/Ogar/issues"
+    "url": "https://github.com/beambotxyz-bit/Blobz/issues"
   },
-  "homepage": "https://github.com/forairan/Ogar"
+  "homepage": "https://github.com/beambotxyz-bit/Blobz"
 }

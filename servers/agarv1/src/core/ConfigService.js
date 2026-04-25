@@ -23,8 +23,8 @@ const path = require("path");
 module.exports = class ConfigService {
   constructor(ismaster) {
     this.config = { // Border - Right: X increases, Down: Y increases (as of 2015-05-20)
-      clientSMacro: 0,
-      clientWMacro: 0,
+      clientSMacro: 1,
+      clientWMacro: 1,
       clientQMacro: 0,
       clientEMacro: 0,
       clientRMacro: 0,
@@ -266,27 +266,27 @@ module.exports = class ConfigService {
     return this.skins;
   }
   loadUniBan() {
+    let data = '';
 
-    request('https://raw.githubusercontent.com/Emupedia/emupedia-game-agar.io/master/docs/ipBanList.txt', function(error, response, body) {
-      var data = '';
-      if (!error && response.statusCode == 200) {
-        fs.writeFileSync(__dirname + '/../uniban.txt', body);
-        this.log("[\x1b[32mOK\x1b[0m] Uniban updated");
-        var data = body
-      } else {
-        var data = fs.readFileSync(__dirname + '/../uniban.txt', body);
-        this.log("[\x1b[34mINFO\x1b[0m] Couldnt connect to server, uniban is loaded from local files.")
-      }
+    try {
+      data = fs.readFileSync(__dirname + '/../../../../docs/ipBanList.txt', 'utf8');
+      fs.writeFileSync(__dirname + '/../uniban.txt', data);
+      this.log("[\x1b[32mOK\x1b[0m] Uniban loaded from local Blobz files");
+    } catch (error) {
       try {
-        this.uniban = data.split(/[\r\n]+/).filter(function(x) {
-          return x != ''; // filter empty names
-        });
-
-      } catch (e) {
-
+        data = fs.readFileSync(__dirname + '/../uniban.txt', 'utf8');
+        this.log("[\x1b[34mINFO\x1b[0m] Couldnt load docs/ipBanList.txt, uniban is loaded from local files.");
+      } catch (fallbackError) {
+        fs.writeFileSync(__dirname + '/../uniban.txt', '');
+        data = '';
       }
+    }
 
-    }.bind(this));
+    try {
+      this.uniban = data.split(/[\r\n]+/).filter(function(x) {
+        return x != '';
+      });
+    } catch (e) {}
   }
   loadid() {
     try {
@@ -422,16 +422,7 @@ module.exports = class ConfigService {
     try {
       if (!fs.existsSync(__dirname + '/../customskins.txt')) {
         this.log("[\x1b[34mINFO\x1b[0m] Generating customskin.txt...");
-        request('https://raw.githubusercontent.com/sethdm02/Ogar-Unlimited-With-Client/master/src/customskins.txt', function(error, response, body) {
-          if (!error && response.statusCode == 200) {
-
-            fs.writeFileSync(__dirname + '/../customskins.txt', body);
-
-          } else {
-            this.log("[\x1b[31mFAIL\x1b[0m] Could not fetch data from servers... will generate empty file");
-            fs.writeFileSync(__dirname + '/../customskins.txt', "");
-          }
-        });
+        fs.writeFileSync(__dirname + '/../customskins.txt', "");
       }
       var loadskins = fs.readFileSync(__dirname + "/../customskins.txt", "utf8").split(/[\r\n]+/).filter(function(x) {
         return x != ''; // filter empty names

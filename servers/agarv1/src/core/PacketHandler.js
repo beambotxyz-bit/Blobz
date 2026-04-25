@@ -23,6 +23,7 @@ function PacketHandler(gameServer, socket) {
   this.pressQ = false;
   this.pressW = false;
   this.pressSpace = false;
+  this.pressC = false;
   this.pressE = false;
   this.pressR = false;
   this.pressT = false;
@@ -30,6 +31,7 @@ function PacketHandler(gameServer, socket) {
   // Rate limiting for key presses to prevent packet flooding from scripts
   this.lastWPressTime = 0;
   this.lastSpacePressTime = 0;
+  this.lastMaxSplitTime = 0;
 
   // Packet statistics tracking
   this.packetStats = {
@@ -43,6 +45,7 @@ function PacketHandler(gameServer, socket) {
     22: 0,  // E key
     23: 0,  // R key
     24: 0,  // T key
+    25: 0,  // C key (max split x16)
     90: 0,  // Chat (cigar)
     99: 0,  // Chat (cigar)
     254: 0, // Protocol acknowledgment/handshake
@@ -156,6 +159,15 @@ PacketHandler.prototype.handleMessage = function(message) {
       case 18:
         // Q Key Pressed
         this.pressQ = true;
+        break;
+      case 25:
+        // C Key Pressed - Max split using the normal split physics
+        var now = Date.now();
+        var multiSplitMinInterval = this.gameServer.config.splitCooldown || 100;
+        if (!this.lastMaxSplitTime || (now - this.lastMaxSplitTime >= multiSplitMinInterval)) {
+          this.pressC = true;
+          this.lastMaxSplitTime = now;
+        }
         break;
       case 19:
         // Q Key Released

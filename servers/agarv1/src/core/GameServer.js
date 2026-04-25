@@ -392,7 +392,7 @@ module.exports = class GameServer {
           console.log("[Error] Server could not bind to port! Please close out of Skype or change 'serverPort' in src/settings to a different number.");
           break;
         case "EACCES":
-          console.log("[Error] Please make sure you are running Ogar with root privileges.");
+          console.log("[Error] Please make sure you are running the Blobz server with the required privileges.");
           break;
         default:
           console.log("[Error] Unhandled error code: " + e.code);
@@ -411,8 +411,13 @@ module.exports = class GameServer {
       }
 
       let origin = ws.upgradeReq.rawHeaders[ws.upgradeReq.rawHeaders.indexOf('Origin') + 1];
+      let allowedOrigins = new Set([
+        'http://localhost:58585',
+        'http://localhost:8081',
+        'http://127.0.0.1:8081'
+      ]);
 
-      if (origin !== 'https://emupedia.net' && origin !== 'https://emupedia.org' && origin !== 'https://emupedia.games' && origin !== 'https://emuos.org' && origin !== 'https://emuos.net' && origin !== 'https://emuos.games' && origin !== 'http://localhost:58585') {
+      if (!allowedOrigins.has(origin)) {
         console.log('[' + (new Date().toISOString().replace('T', ' ')) + '] Origin: ' + origin + ' REFUSED');
         ws.close();
         return;
@@ -1436,44 +1441,40 @@ module.exports = class GameServer {
 
   }
 
-  ejectBiggest(client) {
-    let cell = client.getBiggestc();
-    if (!cell) {
-      return;
-    }
-    if (this.config.ejectvirus != 1) {
-      if (cell.mass < this.config.playerMinMassEject) {
-        return;
-      }
+  ejectCellFromPlayer(client, cell) {
+    let dx = client.mouse.x - cell.position.x;
+    let dy = client.mouse.y - cell.position.y;
+    let squared = dx * dx + dy * dy;
+
+    if (squared > 1) {
+      let distance = Math.sqrt(squared);
+      dx /= distance;
+      dy /= distance;
     } else {
-      if (cell.mass < this.config.playerminviruseject) {
-        return;
-      }
-
+      dx = 0;
+      dy = 1;
     }
 
-    let angle = utilities.getAngleFromClientToCell(client, cell);
-
-    // Randomize angle
-    angle += (Math.random() * 0.1) - 0.05;
-
-    // Get starting position
-    let size = cell.getSize() + 0.2;
-    let startPos = {
-      x: cell.position.x + ((size + this.config.ejectMass) * Math.sin(angle)),
-      y: cell.position.y + ((size + this.config.ejectMass) * Math.cos(angle))
-    };
-
-    // Remove mass from parent cell
     if (this.config.ejectvirus != 1) {
       cell.mass -= this.config.ejectMassLoss;
     } else {
       cell.mass -= this.config.virusmassloss;
     }
-    // Randomize angle
-    angle += (Math.random() * 0.6) - 0.3;
 
-    // Create cell
+    let sourceSize = cell.getSize();
+    let ejectSize = Math.ceil(Math.sqrt(100 * this.config.ejectMass));
+    let startPos = {
+      x: cell.position.x + ((sourceSize + ejectSize) * dx),
+      y: cell.position.y + ((sourceSize + ejectSize) * dy)
+    };
+
+    let angle = Math.atan2(dx, dy);
+    if (isNaN(angle)) {
+      angle = Math.PI / 2;
+    } else {
+      angle += (Math.random() * 0.6) - 0.3;
+    }
+
     let ejected = undefined;
     if (this.config.ejectvirus != 1) {
       ejected = new Entity.EjectedMass(this.world.getNextNodeId(), null, startPos, this.config.ejectMass, this);
@@ -1495,7 +1496,25 @@ module.exports = class GameServer {
     }
 
     this.addNode(ejected, "moving");
+    return true;
+  }
 
+  ejectBiggest(client) {
+    let cell = client.getBiggestc();
+    if (!cell) {
+      return;
+    }
+    if (this.config.ejectvirus != 1) {
+      if (cell.mass < this.config.playerMinMassEject) {
+        return;
+      }
+    } else {
+      if (cell.mass < this.config.playerminviruseject) {
+        return;
+      }
+
+    }
+    this.ejectCellFromPlayer(client, cell);
   }
 
   // todo refactor this is way to long and does way to many different things
@@ -1526,64 +1545,9 @@ module.exports = class GameServer {
 
           }
 
-          let angle = utilities.getAngleFromClientToCell(client, cell);
-
-          // Randomize angle
-          angle += (Math.random() * 0.1) - 0.05;
-
-          // Get starting position
-          let size = cell.getSize() + 0.2; //add speed of playercell
-          let startPos = {
-            x: cell.position.x + ((size + this.config.ejectMass) * Math.sin(angle)),
-            y: cell.position.y + ((size + this.config.ejectMass) * Math.cos(angle))
-          };
-
-          if (angle == 0) {
-            angle = Math.PI / 2;
-            startPos = {
-              x: cell.position.x + (size * Math.sin(angle)),
-              y: cell.position.y + (size * Math.cos(angle))
-            };
+          if (this.ejectCellFromPlayer(client, cell)) {
+            ejectedCells++;
           }
-
-          // Remove mass from parent cell
-          if (this.config.ejectvirus != 1) {
-            cell.mass -= this.config.ejectMassLoss;
-          } else {
-            cell.mass -= this.config.virusmassloss;
-          }
-          // Randomize angle
-          angle += (Math.random() * 0.6) - 0.3;
-
-          // Create cell
-          let ejected = undefined;
-          if (this.config.ejectvirus != 1) {
-            ejected = new Entity.EjectedMass(this.world.getNextNodeId(), null, startPos, this.config.ejectMass, this);
-          } else {
-            ejected = new Entity.Virus(this.world.getNextNodeId(), null, startPos, this.config.ejectMass, this);
-          }
-          ejected.setAngle(angle);
-
-          // Set ejectspeed to "60" in config for best results
-          if (this.config.ejectvirus == 1) {
-            ejected.setMoveEngineData(this.config.ejectvspeed, 40, this.config.wDistance);
-
-          } else {
-            ejected.setMoveEngineData(this.config.ejectSpeed, 40, this.config.wDistance);
-          }
-          if (this.config.ejectvirus == 1) {
-            ejected.par = client;
-
-          }
-
-          if (this.config.randomEjectMassColor == 1) {
-            ejected.setColor(this.getRandomColor());
-          } else {
-            ejected.setColor(cell.getColor());
-          }
-
-          this.addNode(ejected, "moving");
-          ejectedCells++;
         }
       }
       if (ejectedCells > 0) {
@@ -1658,17 +1622,33 @@ module.exports = class GameServer {
     Physics.splitCells(client, this.getWorld(), this);
   };
 
-  updateClients() {
-    this.getClients().forEach((client) => {
-      if (!client || !client.playerTracker) {
-        return;
+  maxSplitCells(client, targetCells) {
+    if (!client || !client.cells || client.cells.length <= 0) {
+      return;
+    }
+    var hardCap = Math.min(targetCells || this.config.playerMaxCells, this.config.playerMaxCells);
+    var guard = hardCap;
+    while (client.cells.length < hardCap && guard > 0) {
+      var before = client.cells.length;
+      this.splitCells(client);
+      if (client.cells.length <= before) {
+        break;
       }
-      var buffer = client.playerTracker.updateBuffer;
-      setTimeout(function () {
-        client.playerTracker.antiTeamTick();
-        client.playerTracker.update();
-      }, buffer);
-    });
+      guard--;
+    }
+  };
+
+  updateClients() {
+    var clients = this.getClients();
+    var clientCount = clients.length;
+    for (var i = 0; i < clientCount; i++) {
+      var client = clients[i];
+      if (!client || !client.playerTracker) {
+        continue;
+      }
+      client.playerTracker.antiTeamTick();
+      client.playerTracker.update();
+    }
   };
 
   cellUpdateTick() {

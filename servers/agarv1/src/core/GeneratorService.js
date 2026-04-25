@@ -74,8 +74,17 @@ module.exports = class GeneratorService {
   }
 
   spawnFood() {
+    let minMass = Math.max(0.01, Number(this.config.foodMass) || 0.01);
+    let maxMass = Math.max(minMass, Number(this.config.foodMassLimit) || minMass);
+    let mass = minMass;
+    if (maxMass > minMass) {
+      let minSize = Math.sqrt(minMass * 100);
+      let maxSize = Math.sqrt(maxMass * 100);
+      let size = minSize + Math.random() * (maxSize - minSize);
+      mass = (size * size) / 100;
+    }
     this.foodSpawned++;
-    let f = new Entity.Food(this.gameServer.getWorld().getNextNodeId(), null, utilities.getRandomPosition(this.config.borderRight, this.config.borderLeft, this.config.borderBottom, this.config.borderTop), this.config.foodMass, this.gameServer);
+    let f = new Entity.Food(this.gameServer.getWorld().getNextNodeId(), null, utilities.getRandomPosition(this.config.borderRight, this.config.borderLeft, this.config.borderBottom, this.config.borderTop), mass, this.gameServer);
     if (this.config.playerOldColors == 1) {
       f.setColor(this.gameServer.getRandomColor());
     } else {

@@ -30,7 +30,7 @@ if (global.gc) {
 // There is no stopping an exit so clean up
 // NO ASYNC CODE HERE - only use SYNC or it will not happen
 process.on('exit', (code) => {
-  console.log("[\x1b[34mINFO\x1b[0m] OgarUnlimited terminated with code: " + code);
+  console.log("[\x1b[34mINFO\x1b[0m] Blobz terminated with code: " + code);
   multiverse.stop();
 });
 

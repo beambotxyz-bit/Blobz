@@ -31,6 +31,9 @@ speed-measure-plugin.json
 /.cache
 /.sass-cache
 /.codex-runtime
+/output
+/progress.md
+/servers/ouid.txt
 /connect.lock
 /coverage
 /libpeerconnection.log

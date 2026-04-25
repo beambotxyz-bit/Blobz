@@ -4,24 +4,24 @@
 		<meta charset="utf-8">
 
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-		<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' data: *; media-src 'self' data: *; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' emupedia.net *.emupedia.net emupedia.org *.emupedia.org emupedia.games *.emupedia.games emuos.net *.emuos.net emuos.org *.emuos.org emuos.games *.emuos.games; connect-src 'self' wss://agar.emupedia.net wss://agar.emupedia.org wss://agar.emupedia.games wss://agar.emuos.net wss://agar.emuos.org wss://agar.emuos.games wss://agar2.emupedia.net wss://agar2.emupedia.org wss://agar2.emupedia.games wss://agar2.emuos.net wss://agar2.emuos.org wss://agar2.emuos.games emupedia.net *.emupedia.net emupedia.org *.emupedia.org emupedia.games *.emupedia.games emuos.net *.emuos.net emuos.org *.emuos.org emuos.games *.emuos.games; manifest-src 'self'; frame-src 'self' data: emupedia.net *.emupedia.net emupedia.org *.emupedia.org emupedia.games *.emupedia.games emuos.net *.emuos.net emuos.org *.emuos.org emuos.games *.emuos.games;" />
+		<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' data: *; media-src 'self' data: *; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' ws://localhost:3000 ws://127.0.0.1:3000 wss://localhost:3000 wss://127.0.0.1:3000; manifest-src 'self'; frame-src 'self' data:;" />
 		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
 		<meta http-equiv="imagetoolbar" content="no" />
 
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
 
-		<meta property="og:title" content="Agar.io" />
-		<meta property="og:description" content="Eat cells smaller than you and don't get eaten by the bigger ones, as an MMO" />
-		<meta property="og:url" content="https://emupedia.net/emupedia-game-agar.io/" />
-		<meta property="og:image" content="https://emupedia.net/emupedia-game-agar.io/img/banner.png" />
+		<meta property="og:title" content="Blobz" />
+		<meta property="og:description" content="Blobz is a fast browser arena where you absorb, dodge, split, and outgrow the field." />
+		<meta property="og:url" content="https://github.com/beambotxyz-bit/Blobz" />
+		<meta property="og:image" content="img/blobz-banner.png" />
 		<meta property="og:image:width" content="1200" />
 		<meta property="og:image:height" content="630" />
 		<meta property="og:type" content="website" />
 
-		<title>Agar.io</title>
+		<title>Blobz</title>
 
-		<link rel="shortcut icon" href="https://emupedia.net/emupedia-game-agar.io/favicon.ico" />
-		<link rel="icon" type="image/x-icon" href="https://emupedia.net/emupedia-game-agar.io/favicon.ico" />
+		<link rel="shortcut icon" href="img/blobz-mark.png" />
+		<link rel="icon" type="image/png" href="img/blobz-mark.png" />
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:700" type="text/css" />
 		<link rel="stylesheet" href="css/bootstrap-3.3.4.min.css">
 		<link rel="stylesheet" href="css/gallery.css">
@@ -149,6 +149,72 @@
 				display: none; /* Visible when skins are loaded */
 			}
 
+			#settings {
+				max-height: min(48vh, 360px);
+				overflow-y: auto;
+				padding-right: 2px;
+			}
+
+			.settings-grid {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 8px 12px;
+			}
+
+			.settings-grid label {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				margin: 0;
+				min-width: 0;
+			}
+
+			.settings-audio {
+				margin-top: 12px;
+				padding-top: 12px;
+				border-top: 1px solid rgba(15, 23, 42, 0.08);
+				display: grid;
+				gap: 10px;
+			}
+
+			.settings-heading {
+				font-size: 11px;
+				font-weight: 700;
+				letter-spacing: .08em;
+				text-transform: uppercase;
+				color: #5b6f89;
+			}
+
+			.audio-row {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) 96px 46px;
+				gap: 8px;
+				align-items: center;
+			}
+
+			.audio-toggle {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				margin: 0;
+				min-width: 0;
+			}
+
+			.audio-slider {
+				width: 100%;
+				margin: 0;
+			}
+
+			.audio-value {
+				font-size: 12px;
+				text-align: right;
+				color: #5b6f89;
+			}
+
+			.audio-row.is-disabled {
+				opacity: .55;
+			}
+
 			#footer {
 				text-align: center;
 				margin-bottom: 10px;
@@ -214,12 +280,61 @@
 			.grecaptcha-badge {
 				display: none;
 			}
+
+			@media (max-width: 640px) {
+				#helloDialog {
+					width: min(92vw, 350px);
+					padding: 8px 12px 10px;
+				}
+
+				#nick, #skin {
+					width: 100%;
+					float: none;
+					display: block !important;
+				}
+
+				#skin {
+					margin-top: 8px;
+				}
+
+				.btn-play {
+					width: calc(100% - 58px);
+					margin-right: 10px;
+				}
+
+				.btn-settings {
+					width: 48px;
+				}
+
+				#settings {
+					max-height: 44vh;
+				}
+
+				.settings-grid {
+					grid-template-columns: 1fr;
+				}
+
+				.audio-row {
+					grid-template-columns: 1fr;
+					gap: 6px;
+				}
+
+				.audio-value {
+					text-align: left;
+				}
+			}
+
+			@media (max-height: 540px) {
+				#settings {
+					max-height: 34vh;
+				}
+			}
 		</style>
 	</head>
 	<body>
 		<div id="gallery" style="display: none;">
 			<div id="gallery-content">
-				<div id="gallery-header">Skins</div>
+				<div id="gallery-header">Blobz Skins</div>
 				<div id="gallery-body"></div>
 			</div>
 		</div>
@@ -227,9 +342,9 @@
 			<div id="helloDialog">
 				<form id="form" role="form">
 					<div class="form-group">
-						<div><h2 id="title" class="text-center">Agar.io</h2></div>
+						<div><h2 id="title" class="text-center">Blobz</h2></div>
 						<hr class="top" />
-						<a class="text-center" style="display: block; color: red;" href="https://discord.gg/emupedia-510149138491506688" target="_blank">Join us on Discord if you have suggestions</a>
+						<div class="text-center" style="display: block; color: #3b6ea8;">Blobz early access build</div>
 					</div>
 					<div class="form-group">
 						<input id="nick" class="form-control" style="display: inline-block;" placeholder="Nick" maxlength="15" />
@@ -246,7 +361,7 @@
 						<h4>Cannot connect to server, click the reconnect button below to try again</h4><br>
 					</div>
 					<div class="checkbox" id="settings" style="display:none;">
-						<div style="margin: 6px;">
+						<div class="settings-grid" style="margin: 6px;">
 							<label><input id="cskin" onchange="setSkins(!$(this).is(':checked'));" type="checkbox" /> No skins</label>
 							<label><input id="cname" onchange="setNames(!$(this).is(':checked'));" type="checkbox" /> No names</label>
 							<label><input id="cdark" onchange="setDarkTheme($(this).is(':checked'));" type="checkbox" /> Dark Theme</label>
@@ -261,26 +376,40 @@
 							<label><input id="cminimap" onchange="setMinimap($(this).is(':checked'));" type="checkbox" checked />Show Minimap</label>
 							<label><input id="cbgsectors" onchange="setBackgroundSectors($(this).is(':checked'));" type="checkbox" checked />Show Background Sectors</label>
 						</div>
+						<div class="settings-audio" style="margin: 6px;">
+							<div class="settings-heading">Audio</div>
+							<div class="audio-row" id="sound-effects-row">
+								<label class="audio-toggle"><input id="csounds" onchange="setPlaySounds($(this).is(':checked'));" type="checkbox" checked /> Sound Effects</label>
+								<input id="sound-volume" class="audio-slider" onchange="setSoundsVolume(this.value)" oninput="setSoundsVolume(this.value)" type="range" min="0" max="1" step="0.01" value="0.45" />
+								<span class="audio-value" id="sound-volume-value">45%</span>
+							</div>
+							<div class="audio-row" id="music-row">
+								<label class="audio-toggle"><input id="cmusic" onchange="setPlayMusic($(this).is(':checked'));" type="checkbox" checked /> Background Music</label>
+								<input id="music-volume" class="audio-slider" onchange="setMusicVolume(this.value)" oninput="setMusicVolume(this.value)" type="range" min="0" max="1" step="0.01" value="0.28" />
+								<span class="audio-value" id="music-volume-value">28%</span>
+							</div>
+						</div>
 					</div>
 				</form>
 				<hr />
 				<div id="instructions" class="text-center text-muted">
 					<div>Move your mouse to control your cell</div>
 					<div>Press <b>Space</b> to split</div>
+					<div>Press <b>C</b> for max split <b>x16</b></div>
 					<div>Press <b>W</b> to eject some mass</div>
 				</div>
 				<hr />
 				<div id="footer">
-					<span class="text-muted">Have fun!</span>
+					<span class="text-muted">Grow smart. Stay alive.</span>
 				</div>
 			</div>
 		</div>
 
 		<div id="connecting" style="display:none; position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 201; background-color: rgba(0,0,0,0.5);">
 			<div style="width: 350px; background-color: #fff; margin: 100px auto; border-radius: 15px; padding: 5px 15px 5px 15px;">
-				<h3>Trying to connect...</h3><hr />
-				<a class="text-center" style="display: block; color: red;" href="https://discord.gg/emupedia-510149138491506688" target="_blank">Join us on Discord!</a>
-				<p>If you cannot connect to the servers, check if you have some antivirus or firewall blocking the connection.</p>
+				<h3>Connecting to Blobz...</h3><hr />
+				<div class="text-center" style="display: block; color: #3b6ea8;">Launching your local arena session</div>
+				<p>If you cannot connect, check whether your local Blobz server is running and whether a firewall is blocking the websocket connection.</p>
 			</div>
 		</div>
 
@@ -290,12 +419,12 @@
 			<input id="chat_textbox" maxlength="70" autocomplete="off" placeholder="Press Enter to chat!" type="text" />
 		</form>
 
-		<div id="skins" style="display: none;" title="Skins List (Click Your Skin)"></div>
+		<div id="skins" style="display: none;" title="Blobz Skins"></div>
 
 		<script src="js/jquery-2.1.4.min.js"></script>
 		<script src="js/fp.umd.min.js"></script>
 		<script src="js/vector2.js"></script>
-		<script src="js/main.js?v=21"></script>
-		<script src="js/interface.js?v=1"></script>
+		<script src="js/main.js?v=32"></script>
+		<script src="js/interface.js?v=4"></script>
 	</body>
 </html>

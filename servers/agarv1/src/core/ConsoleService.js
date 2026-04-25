@@ -221,8 +221,8 @@ module.exports = class ConsoleService {
     this.log(" \\___/ \\_|| |\\_||_|_|       \\____|_| |_|_|_|_|_|_|_|\\___)____)____|");
     this.log("      (_____|                                                      \u001B[0m");
 
-    this.log("\x1b[32m[Game] Ogar Unlimited - An open source Agar.io server implementation");
-    this.log("[Game] By The AJS development team\x1b[0m");
+    this.log("\x1b[32m[Game] Blobz - browser arena game server\x1b[0m");
+    this.log("[Game] Powered by the Blobz build\x1b[0m");
     this.log("[Game] Server version is " + this.version);
   }
   prompt(in_) {

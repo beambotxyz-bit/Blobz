@@ -1,661 +1,86 @@
+<!doctype html>
 <html lang="en">
 	<head>
-		<title>Agar.io v2.0 - Upload Custom Skin</title>
-		<link href="cigar2/assets/css/bootstrap.min.css" rel="stylesheet">
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Blobz - Custom Skin Upload</title>
+		<link rel="icon" type="image/png" href="img/blobz-mark.png" />
 		<style>
+			:root {
+				--bg: #eef6ff;
+				--fg: #1c2a40;
+				--muted: #5e7493;
+				--line: rgba(50, 86, 130, 0.12);
+				--card: rgba(255, 255, 255, 0.94);
+				--shadow: 0 16px 36px rgba(16, 42, 78, 0.14);
+				--cta: #2d6cdf;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
 			body {
 				margin: 0;
-				padding: 0 20px;
-				background: none transparent;
-				border-radius: 15px;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				padding: 24px;
+				font-family: "Segoe UI", Arial, sans-serif;
+				color: var(--fg);
+				background:
+					linear-gradient(var(--line) 1px, transparent 1px),
+					linear-gradient(90deg, var(--line) 1px, transparent 1px),
+					linear-gradient(180deg, #f9fbff, var(--bg));
+				background-size: 48px 48px, 48px 48px, 100% 100%;
 			}
 
-			/*noinspection CssUnusedSymbol*/
-			body.loading::after {
-				position: absolute;
-				left: 0;
-				right: 0;
-				top: 0;
-				bottom: 0;
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				content: 'Loading \A Please wait...';
-				width: 100%;
-				height: 100%;
-				background-color: rgba(0, 0, 0, 0.9);
-				background-image: url(cigar2/assets/img/loading.gif);
-				background-repeat: no-repeat;
-				background-position: center 100px;
-				padding-top: 100px;
-				font-size: 42px;
-				text-align: center;
-				white-space: pre-wrap;
-				color: #fff;
-			}
-
-			*::-webkit-scrollbar {
-				width: 5px;
-				height: 5px;
-			}
-
-			*::-webkit-scrollbar-thumb, *::-webkit-scrollbar-thumb:horizontal {
-				background: #888;
-				border-radius: 3px;
-			}
-
-			*::-webkit-scrollbar-thumb:hover, *::-webkit-scrollbar-thumb:horizontal:hover {
-				background: #555;
-			}
-
-			hr {
-				border-top: 2px solid #000;
-				margin-top: 15px;
-				margin-bottom: 15px;
-			}
-
-			hr.top {
-				margin-top: 5px;
-			}
-
-			h3 {
-				margin-top: 10px;
-				margin-bottom: 10px;
+			.card {
+				max-width: 560px;
+				padding: 34px;
+				border-radius: 28px;
+				background: var(--card);
+				box-shadow: var(--shadow);
 				text-align: center;
 			}
 
-			label {
-				display: block;
-				margin-bottom: auto;
-				user-select: none;
-				font-size: 14px;
+			img {
+				width: 72px;
+				height: 72px;
+				margin-bottom: 14px;
 			}
 
-			label, input[type=checkbox] {
-				cursor: pointer;
+			h1 {
+				margin: 0 0 10px;
+				font-size: 34px;
 			}
 
-			.button-wrapper {
-				display: flex;
-				width: 100%;
-				height: 17%;
-				justify-content: center;
-				align-items: center;
+			p {
+				margin: 0 0 16px;
+				font-size: 16px;
+				line-height: 1.55;
+				color: var(--muted);
 			}
 
-			.upload-btn-wrapper {
-				width: 100%;
-				position: relative;
-				overflow: hidden;
+			a {
 				display: inline-block;
-				cursor: pointer;
-			}
-
-			.upload-btn-wrapper button {
-				width: 100%;
-				cursor: pointer;
-			}
-
-			.upload-btn-wrapper input[type=file] {
-				position: absolute;
-				left: 0;
-				top: 0;
-				opacity: 0;
-				font-size: 100px;
-				cursor: pointer;
-			}
-
-			.upload-btn-wrapper input[type=file]::file-selector-button {
-				cursor: pointer;
-			}
-
-			.upload-skin-content {
-				max-width: 510px;
-				margin: auto;
-			}
-
-			#captcha {
-				text-align: center;
-			}
-
-			#captcha iframe {
-				margin: auto;
-			}
-
-			#phrase {
-				width: 100%;
-				background: #000;
+				margin-top: 6px;
+				padding: 12px 18px;
+				border-radius: 999px;
+				background: var(--cta);
 				color: #fff;
-			}
-
-			.error-wrapper {
-				text-align: center;
-			}
-
-			.error {
-				color: red;
-				margin: 0;
-			}
-
-			.darkTheme a {
-				color: #fff;
-			}
-
-			.darkTheme hr {
-				border-top: 2px solid #fff;
-			}
-
-			.darkTheme body {
-				color: #fff;
+				text-decoration: none;
+				font-weight: 700;
 			}
 		</style>
 	</head>
 	<body>
-		<div class="upload-skin-content">
-			<div id="error" class="error-wrapper" style="display: none">
-				<h3 id="error-message" class="error">Image probably contains NSFW content and was not uploaded</h3>
-			</div>
-			<div class="header-wrapper">
-				<h3>Upload Skin</h3><hr class="top" />
-				<label><input id="c1" class="upload-checkbox" type="checkbox" /> I agree I will not upload pictures depicting NSFW or pornographic content</label>
-				<label><input id="c2" class="upload-checkbox" type="checkbox" /> I agree I will not upload pictures disgusting for shock value or gore content</label>
-				<label><input id="c3" class="upload-checkbox" type="checkbox" /> I agree I will not upload pictures of real people, myself, my friends</label>
-				<label><input id="c4" class="upload-checkbox" type="checkbox" /> I agree I will not upload pictures of famous people (actors, musicians, football players, etc.)</label>
-<!--				<label><input id="c5" class="upload-checkbox" type="checkbox" /> I agree I will not upload pictures that shows the face of any real person</label>-->
-<!--				<label><input id="c6" class="upload-checkbox" type="checkbox" /> I understand that I need to have an IQ level of at least 50 IQ points and can solve a Captcha</label>-->
-				<label><input id="c7" class="upload-checkbox" type="checkbox" /> I understand that if I break any of these rules I will be banned from using the game</label>
-				<label><input id="c8" class="upload-checkbox" type="checkbox" /> I understand that I will not cry in Discord after I have been banned from the game</label>
-				<h6>After you've read all the rules and checked all the checkboxes, then type the following phrase exactly as seen: <b>I will not upload pictures that shows the face of any real person</b></h6>
-				<input id="phrase" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onpaste="return false;" ondrop="return false;" value="" />
-				<hr />
-			</div>
-			<div class="button-wrapper">
-				<div id="captcha" style="display: none;"></div>
-				<div class="upload-btn-wrapper" style="display: none;">
-					<button class="btn btn-play btn-primary btn-needs-server btn-info">Upload Skin</button>
-					<input id="upload-btn" type="file" accept="image/x-png,image/png,image/jpeg,image/webp,image/avif" name="source" />
-				</div>
-			</div>
+		<div class="card">
+			<img src="img/blobz-mark.png" alt="Blobz mark" />
+			<h1>Custom Skin Upload</h1>
+			<p>The old upstream upload flow has been retired during the Blobz rebrand.</p>
+			<p>For now, use the built-in Blobz skin gallery from the main lobby. We can add a first-party Blobz upload flow later without changing gameplay.</p>
+			<a href="./">Return To Blobz</a>
 		</div>
-
-		<script>
-			document.body.classList.add('loading');
-
-			const settings = {
-				darkTheme: false
-			}
-
-			function loadSettings() {
-				const text = localStorage.getItem('settings');
-				const obj = text ? JSON.parse(text) : settings;
-
-				settings.darkTheme = obj['darkTheme'];
-
-				if (settings.darkTheme === true) {
-					document.documentElement.classList.add('darkTheme');
-
-					if (window.top.location === window.location) {
-						document.documentElement.style.backgroundColor = 'rgba(9,13,23,0.6)';
-					}
-				}
-			}
-
-			loadSettings();
-		</script>
-
-		<script src="js/jquery-2.1.4.min.js"></script>
-		<script src="https://js.hcaptcha.com/1/api.js?render=explicit" async defer></script>
-		<script src="nsfwjs/browser/tf.min.js" type="text/javascript"></script>
-		<script src="nsfwjs/browser/nsfwjs.min.js" type="text/javascript"></script>
-
-		<script>
-			// noinspection JSUnresolvedReference
-			tf.setBackend('cpu');
-			// noinspection JSUnresolvedReference
-			tf.enableProdMode();
-
-			Element.prototype.hide = function () {
-				// noinspection JSUnresolvedReference
-				this.style.display = 'none';
-				// noinspection JSUnresolvedReference
-				if (this.style.opacity === 1) {
-					// noinspection JSUnresolvedReference
-					this.style.opacity = 0;
-				}
-			}
-
-			Element.prototype.show = function(seconds) {
-				// noinspection JSUnresolvedReference
-				this.style.display = '';
-				if (!seconds) return;
-				// noinspection JSUnresolvedReference
-				this.style.transition = `opacity ${seconds}s ease 0s`;
-				// noinspection JSUnresolvedReference
-				this.style.opacity = 1;
-			}
-
-			const S = atob('RVNfN2YzMDM2YTFlZmI5NGYyY2E3OTFjNjEwZDMzYjk3NDA=');
-
-			let interval;
-
-			function byId(id) {
-				return document.getElementById(id);
-			}
-
-			function byClass(clss, parent) {
-				return (parent || document).getElementsByClassName(clss);
-			}
-
-			function checkNSFW(image, cb) {
-				// noinspection JSUnresolvedReference
-				if (typeof tf !== 'undefined' && typeof nsfwjs !== 'undefined') {
-					if (window.Worker && typeof OffscreenCanvas !== 'undefined') {
-						const worker = new Worker('nsfwjs/browser/nsfw-worker.js');
-						worker.onmessage = e => {
-							if (e.data === true) {
-								if (typeof cb === 'function') {
-									cb(image.split(',')[1]);
-								}
-							} else {
-								document.body.classList.remove('loading');
-								byId('error-message').innerHTML = 'Image probably contains NSFW content and was not uploaded';
-								byId('error').show();
-								byId('captcha').innerHTML = '';
-								byId('captcha').hide();
-								byId('phrase').value = '';
-								byClass('upload-btn-wrapper')[0].hide();
-								Array.from(byClass('upload-checkbox')).map(item => {
-									item.disabled = false;
-									item.checked = false;
-								});
-								setTimeout(() => {
-									alert('Image probably contains NSFW content and was not uploaded');
-									try {
-										if (window && window.parent) {
-											if (typeof window.parent.closeUpload === 'function') {
-												window.parent.closeUpload();
-											} else {
-												window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-											}
-										}
-									} catch(e) {}
-								}, 100);
-							}
-						}
-
-						setTimeout(() => {
-							worker.postMessage(image);
-						}, 3000)
-					} else {
-						const img = new Image();
-						img.crossOrigin = 'anonymous';
-						img.src = image;
-						img.onload = () => {
-							// noinspection JSUnresolvedReference
-							nsfwjs.load('nsfwjs/models/inception_v3/model.json', { size: 299 }).then(model => {
-								// noinspection JSUnresolvedReference
-								model.classify(img, 1).then(predictions => {
-									if (predictions[0] && predictions[0].className) {
-										if (predictions[0].className === 'Neutral' || predictions[0].className === 'Drawing') {
-											// noinspection JSUnresolvedReference
-											nsfwjs.load('nsfwjs/models/mobilenet_v2/model.json', { type: 'graph' }).then(model => {
-												// noinspection JSUnresolvedReference
-												model.classify(img, 1).then(predictions => {
-													if (predictions[0] && predictions[0].className) {
-														if (predictions[0].className === 'Neutral' || predictions[0].className === 'Drawing') {
-															if (typeof cb === 'function') {
-																cb(image.split(',')[1]);
-															}
-														} else {
-															document.body.classList.remove('loading');
-															byId('error-message').innerHTML = 'Image probably contains NSFW content and was not uploaded';
-															byId('error').show();
-															byId('captcha').innerHTML = '';
-															byId('captcha').hide();
-															byId('phrase').value = '';
-															byClass('upload-btn-wrapper')[0].hide();
-															Array.from(byClass('upload-checkbox')).map(item => {
-																item.disabled = false;
-																item.checked = false;
-															});
-															setTimeout(() => {
-																alert('Image probably contains NSFW content and was not uploaded');
-																try {
-																	if (window && window.parent) {
-																		if (typeof window.parent.closeUpload === 'function') {
-																			window.parent.closeUpload();
-																		} else {
-																			window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-																		}
-																	}
-																} catch(e) {}
-															}, 100);
-														}
-													} else {
-														setTimeout(() => {
-															alert('Cannot check image for NSFW content, please try again later');
-															try {
-																if (window && window.parent) {
-																	if (typeof window.parent.closeUpload === 'function') {
-																		window.parent.closeUpload();
-																	} else {
-																		window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-																	}
-																}
-															} catch(e) {}
-														}, 100);
-													}
-												});
-											});
-										} else {
-											document.body.classList.remove('loading');
-											byId('error-message').innerHTML = 'Image probably contains NSFW content and was not uploaded';
-											byId('error').show();
-											byId('captcha').innerHTML = '';
-											byId('captcha').hide();
-											byId('phrase').value = '';
-											byClass('upload-btn-wrapper')[0].hide();
-											Array.from(byClass('upload-checkbox')).map(item => {
-												item.disabled = false;
-												item.checked = false;
-											});
-											setTimeout(() => {
-												alert('Image probably contains NSFW content and was not uploaded');
-												try {
-													if (window && window.parent) {
-														if (typeof window.parent.closeUpload === 'function') {
-															window.parent.closeUpload();
-														} else {
-															window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-														}
-													}
-												} catch(e) {}
-											}, 100);
-										}
-									} else {
-										setTimeout(() => {
-											alert('Cannot check image for NSFW content, please try again later');
-											try {
-												if (window && window.parent) {
-													if (typeof window.parent.closeUpload === 'function') {
-														window.parent.closeUpload();
-													} else {
-														window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-													}
-												}
-											} catch(e) {}
-										}, 100);
-									}
-								});
-							});
-						};
-					}
-
-				} else {
-					setTimeout(() => {
-						alert('Cannot check image for NSFW content, please try again later');
-						try {
-							if (window && window.parent) {
-								if (typeof window.parent.closeUpload === 'function') {
-									window.parent.closeUpload();
-								} else {
-									window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-								}
-							}
-						} catch(e) {}
-					}, 100);
-				}
-			}
-
-			function checkCaptcha(data) {
-				$.ajax({
-					url: 'https://agar2.emupedia.net/captcha/',
-					type: 'POST',
-					headers: {
-						Accept: 'application/json'
-					},
-					data: {
-						response: data,
-						secret: S
-					},
-					error: () => {
-						alert('Could not validate Captcha, please try again later');
-
-						try {
-							if (window && window.parent) {
-								if (typeof window.parent.closeUpload === 'function') {
-									window.parent.closeUpload();
-								} else {
-									window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-								}
-							}
-						} catch(e) {}
-					},
-					success: result => {
-						if (typeof result !== 'undefined') {
-							if (typeof result['success'] !== 'undefined') {
-								if (result['success'] === true) {
-									byId('captcha').hide();
-									byId('phrase').value = '';
-									byClass('upload-btn-wrapper')[0].show();
-								} else {
-									alert('Could not validate Captcha, please try again later');
-									try {
-										if (window && window.parent) {
-											if (typeof window.parent.closeUpload === 'function') {
-												window.parent.closeUpload();
-											} else {
-												window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-											}
-										}
-									} catch(e) {}
-								}
-							} else {
-								alert('Could not validate Captcha, please try again later');
-								try {
-									if (window && window.parent) {
-										if (typeof window.parent.closeUpload === 'function') {
-											window.parent.closeUpload();
-										} else {
-											window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-										}
-									}
-								} catch(e) {}
-							}
-						} else {
-							alert('Could not validate Captcha, please try again later');
-							try {
-								if (window && window.parent) {
-									if (typeof window.parent.closeUpload === 'function') {
-										window.parent.closeUpload();
-									} else {
-										window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-									}
-								}
-							} catch(e) {}
-						}
-					}
-				});
-			}
-
-			function getBase64(file, cb) {
-				document.body.classList.add('loading');
-
-				const reader = new FileReader();
-
-				reader.readAsDataURL(file);
-
-				reader.onload = () => {
-					if (typeof cb === 'function') {
-						cb(reader.result);
-					} else {
-						document.body.classList.remove('loading');
-						byId('error-message').innerHTML = 'Failed to upload file [6]';
-						byId('error').show();
-						setTimeout(() => { alert('Failed to upload file [6]'); }, 100);
-					}
-				};
-
-				reader.onerror = error => {
-					console.error(error);
-					document.body.classList.remove('loading');
-					byId('error-message').innerHTML = 'Failed to upload file [7]';
-					byId('error').show();
-					setTimeout(() => { alert('Failed to upload file [7]'); }, 100);
-				};
-			}
-
-			function loadSettings() {
-				return JSON.parse(localStorage.getItem('settings'))
-			}
-
-			function storeSettings(settings) {
-				localStorage.setItem('settings', JSON.stringify(settings));
-			}
-
-			function uploadImage(image) {
-				$.ajax({
-					url: 'https://agar2.emupedia.net/skin-upload/?key=6d207e02198a847aa98d0a2a901485a5',
-					type: 'POST',
-					headers: {
-						Accept: 'application/json'
-					},
-					data: {
-						source: image
-					},
-					success: result => {
-						if (typeof result !== 'undefined') {
-							if (typeof result['image'] !== 'undefined') {
-								if (typeof result['image']['url'] !== 'undefined') {
-									if (result.image.url !== null && result.image.url !== '') {
-										try {
-											if (window && window.parent && typeof window.parent.changeSkin === 'function') {
-												window.parent.changeSkin(null, result.image.url);
-											}
-										} catch(e) {
-											console.error(e);
-											const settings = loadSettings();
-											settings.skin = result.image.url;
-											settings.skinnames.push(result.image.url);
-											storeSettings(settings);
-
-											if (window && window.parent) {
-												window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-											}
-										}
-									} else {
-										document.body.classList.remove('loading');
-										byId('error-message').innerHTML = 'Failed to upload file [1]';
-										byId('error').show();
-										setTimeout(() => { alert('Failed to upload file [1]'); }, 100);
-									}
-								} else {
-									document.body.classList.remove('loading');
-									byId('error-message').innerHTML = 'Failed to upload file [2]';
-									byId('error').show();
-									setTimeout(() => { alert('Failed to upload file [2]'); }, 100);
-								}
-							} else {
-								document.body.classList.remove('loading');
-								byId('error-message').innerHTML = 'Failed to upload file [3]';
-								byId('error').show();
-								setTimeout(() => { alert('Failed to upload file [3]'); }, 100);
-							}
-						} else {
-							document.body.classList.remove('loading');
-							byId('error-message').innerHTML = 'Failed to upload file [4]';
-							byId('error').show();
-							setTimeout(() => { alert('Failed to upload file [4]'); }, 100);
-						}
-					},
-					error: jqXHR => {
-						let message = 'Failed to upload file [5]';
-						if (jqXHR.status === 413) {
-							message = 'File size too big, must be 10MB max, use https://tinypng.com to make it smaller [6]';
-						}
-						document.body.classList.remove('loading');
-						byId('error-message').innerHTML = message;
-						byId('error').show();
-						setTimeout(() => { alert(message); }, 100);
-					},
-					complete: () => {
-						document.body.classList.remove('loading');
-						byId('error-message').innerHTML = '';
-						byId('error').hide();
-						byId('captcha').innerHTML = '';
-						byId('captcha').hide();
-						byId('phrase').value = '';
-						byClass('upload-btn-wrapper')[0].hide();
-						Array.from(byClass('upload-checkbox')).map(item => { item.disabled = false; item.checked = false; });
-
-						try {
-							if (window && window.parent) {
-								if (typeof window.parent.closeUpload === 'function') {
-									window.parent.closeUpload();
-								} else {
-									window.parent.location = `${location.protocol}//${location.hostname}${location.port ? `:${location.port}` : ''}/emupedia-game-agar.io/cigar2/`;
-								}
-							}
-						} catch(e) {}
-					}
-				});
-			}
-
-			const changeUploadSkin = e => getBase64(e.target.files[0], b64 => checkNSFW(b64, image => uploadImage(image)));
-
-			const changeUploadCheckbox = e => {
-				if (e.target.checked === true) {
-					e.target.disabled = true;
-				}
-			}
-
-			const changeInputPhrase = e => {
-				if (Array.from(byClass('upload-checkbox')).every(item => item.checked === true) && e.target.value.toLowerCase() === 'i will not upload pictures that shows the face of any real person') {
-					byId('captcha').innerHTML = '';
-					// noinspection JSUnresolvedReference
-					hcaptcha.render('captcha' , {
-						theme: settings.darkTheme ? 'dark' : '',
-						sitekey: '6bd25504-b5be-483b-9baa-0b53e51edf67'
-					});
-
-					byId('error').hide();
-					byId('captcha').show();
-				} else {
-					byId('captcha').hide();
-				}
-			}
-
-			byId('captcha').innerHTML = '';
-			byId('captcha').hide();
-			byId('phrase').value = '';
-			byId('error').hide();
-
-			Array.from(byClass('upload-checkbox')).map(item => {
-				item.disabled = false;
-				item.checked = false;
-
-				item.removeEventListener('change', changeUploadCheckbox);
-				item.addEventListener('change', changeUploadCheckbox);
-			});
-
-			const observer = new MutationObserver((mutations, observer) => {
-				mutations.forEach(mutation => {
-					if (mutation.target.firstChild && mutation.target.firstChild.tagName.toLowerCase() === 'iframe') {
-						observer.observe(mutation.target.firstChild, { attributes: true });
-					}
-
-					if (mutation.target.tagName.toLowerCase() === 'iframe' && mutation.target.getAttribute('data-hcaptcha-response') !== '') {
-						checkCaptcha(mutation.target.getAttribute('data-hcaptcha-response'))
-					}
-				});
-			});
-
-			observer.observe(byId('captcha'), { attributes: true });
-
-			byId('upload-btn').addEventListener('change', changeUploadSkin);
-			byId('phrase').addEventListener('input', changeInputPhrase);
-
-			document.body.classList.remove('loading');
-		</script>
 	</body>
 </html>

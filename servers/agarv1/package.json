@@ -1,7 +1,7 @@
 {
-  "name": "Ogar_Unlimited",
+  "name": "blobz-server",
   "version": "17.0.0",
-  "description": "Open source Agar.io server",
+  "description": "Blobz v1 server base",
   "main": "src/index.js",
   "engines": {
     "node": "5.9.0"
@@ -21,12 +21,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/AJS-development/Ogar-unlimited"
+    "url": "git+https://github.com/beambotxyz-bit/Blobz.git"
   },
-  "author": "AJS-development",
+  "author": "Blobz Team",
   "license": "Apache License 2.0",
   "bugs": {
-    "url": "https://github.com/AJS-development/Ogar-unlimited/issues"
+    "url": "https://github.com/beambotxyz-bit/Blobz/issues"
   },
-  "homepage": "https://github.com/AJS-development/Ogar-unlimited"
+  "homepage": "https://github.com/beambotxyz-bit/Blobz"
 }

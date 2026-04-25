@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Agar Settings Control Panel</title>
+<title>Blobz Settings Control Panel</title>
 <style>
   :root{
 	  --bg:#f7f7f8;--fg:#0f172a;--muted:#475569;--panel:#ffffff;--border:#e5e7eb;
@@ -91,7 +91,7 @@
 <div class="wrap">
   <header class="row">
     <div>
-      <h1><span class="dirty-dot" aria-hidden="true"></span>Agar Settings Control Panel</h1>
+      <h1><span class="dirty-dot" aria-hidden="true"></span>Blobz Settings Control Panel</h1>
       <div class="tip">Edits <code>localStorage.settings</code>. Works only on the game’s origin.</div>
     </div>
     <div class="row">
@@ -164,17 +164,17 @@
 		// If it's already a complete URL, return as-is
 		if (isURL(s)) return s;
 		
-		// If it's a relative path, convert to Emupedia URL
+		// If it's a relative path, convert to the local Blobz skin path
 		if (s.startsWith('./skins/') || s.startsWith('skins/') || s.startsWith('./cigar2/skins/') || s.startsWith('cigar2/skins/')) {
 			const skinName = s.replace(/^\.?\/?(?:skins|cigar2\/skins)\//, '');
-			return `https://emupedia.net/emupedia-game-agar.io/cigar2/skins/${skinName}`;
+			return `./skins/${skinName}`;
 		}
 		
 		// If it's just a skin name (no path separators)
 		if (!s.includes('/')) {
 			// Add .png extension if not present
 			const skinName = s.endsWith('.png') ? s : `${s}.png`;
-			return `https://emupedia.net/emupedia-game-agar.io/cigar2/skins/${skinName}`;
+			return `./skins/${skinName}`;
 		}
 		
 		return s;
@@ -649,13 +649,13 @@
 			if (currentValue && (
 				currentValue.includes(skinName) || 
 				currentValue.endsWith(`${skinName}.png`) ||
-				currentValue === `https://emupedia.net/emupedia-game-agar.io/cigar2/skins/${skinName}.png`
+				currentValue === `./skins/${skinName}.png`
 			)) {
 				item.classList.add('selected');
 			}
 			
 			const img = document.createElement('img');
-			img.src = `https://emupedia.net/emupedia-game-agar.io/cigar2/skins/${skinName}.png`;
+			img.src = `./skins/${skinName}.png`;
 			img.alt = skinName;
 			img.onerror = () => {
 				// Try local fallback paths
@@ -673,7 +673,7 @@
 			item.addEventListener('click', () => {
 				gallery.querySelectorAll('.skin-item').forEach(i => i.classList.remove('selected'));
 				item.classList.add('selected');
-				onChange(`https://emupedia.net/emupedia-game-agar.io/cigar2/skins/${skinName}.png`);
+				onChange(`./skins/${skinName}.png`);
 			});
 			
 			gallery.appendChild(item);
@@ -701,7 +701,7 @@
 			case 'boolean': init = false; break;
 			case 'number': init = 0; break;
 			case 'color': init = '#ffffff'; break;
-			case 'skin': init = 'https://emupedia.net/emupedia-game-agar.io/cigar2/skins/doge.png'; break;
+			case 'skin': init = './skins/doge.png'; break;
 			case 'object': init = {}; break;
 			case 'array': init = []; break;
 			default: init = '';
@@ -721,7 +721,7 @@
 			case 'boolean': init = false; break;
 			case 'number': init = 0; break;
 			case 'color': init = '#ffffff'; break;
-			case 'skin': init = 'https://emupedia.net/emupedia-game-agar.io/cigar2/skins/doge.png'; break;
+			case 'skin': init = './skins/doge.png'; break;
 			case 'object': init = {}; break;
 			case 'array': init = []; break;
 			default: init = '';

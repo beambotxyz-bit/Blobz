@@ -1,14 +1,26 @@
 $(function() {
-	var location = ~window.location.hostname.indexOf('emupedia.net') ? 'emupedia.net' : (~window.location.hostname.indexOf('emupedia.org') ? 'emupedia.org' : (~window.location.hostname.indexOf('emupedia.games') ? 'emupedia.games' : (~window.location.hostname.indexOf('emuos.net') ? 'emuos.net' : (~window.location.hostname.indexOf('emuos.org') ? 'emuos.org' : (~window.location.hostname.indexOf('emuos.games') ? 'emuos.games' : 'emupedia.net')))));
+	var socketHost = window.location.hostname || '127.0.0.1';
+	var socketUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + socketHost + ':3000/ws1/';
 	var FP = FingerprintJS.load();
 	var externallyFramed;
-	var agarv1ident;
+	var playerIdent;
 	var bannedIdent = [];
 	var knownSkins = [];
+	var knownSkinsSet = {};
 	var interval;
 	var $nick = $('#nick');
 	var $skin = $('#skin');
-	var $gallery = $('#gallery')
+	var $gallery = $('#gallery');
+	var storageKeys = {
+		ident: 'blobzident',
+		nick: 'blobznick',
+		skin: 'blobzskin'
+	};
+	var legacyKeys = {
+		ident: 'agarv1ident',
+		nick: 'agarv1nick',
+		skin: 'agarv1skin'
+	};
 
 	try {
 		externallyFramed = window.top.location.host !== window.location.host;
@@ -22,6 +34,31 @@ $(function() {
 		} catch (e) {}
 	}
 
+	function getStoredValue(key, legacyKey) {
+		try {
+			return localStorage.getItem(key) || localStorage.getItem(legacyKey) || '';
+		} catch (e) {
+			return '';
+		}
+	}
+
+	function setStoredValue(key, value) {
+		try {
+			localStorage.setItem(key, value);
+		} catch (e) {}
+	}
+
+	function clearStoredSkin() {
+		try {
+			localStorage.setItem(storageKeys.skin, '');
+			localStorage.setItem(legacyKeys.skin, '');
+		} catch (e) {}
+	}
+
+	function getSupportMessage() {
+		return '<div class="text-center" style="display: block; color: #3b6ea8;">Blobz support info is coming soon.</div>';
+	}
+
 	function sanitizeSkin(str) {
 		return str.replace(/[^a-zA-Z0-9_\- ]/gim, '').trim();
 	}
@@ -30,11 +67,48 @@ $(function() {
 		return str.replace(/[<>|]/gim, '').trim();
 	}
 
+	function normalizeSkinList(data) {
+		return data
+			.split(',')
+			.map(function(skin) { return sanitizeSkin(skin); })
+			.filter(function(skin, index, arr) {
+				return skin !== '' && arr.indexOf(skin) === index;
+			});
+	}
+
+	function rebuildKnownSkinsSet() {
+		knownSkinsSet = {};
+		knownSkins.forEach(function(skin) {
+			knownSkinsSet[skin] = true;
+		});
+	}
+
+	function isKnownSkin(skin) {
+		return !!knownSkinsSet[sanitizeSkin(skin)];
+	}
+
+	function syncSkinInputWithAvailableSkins() {
+		var currentSkin = sanitizeSkin($skin.val());
+		if (!currentSkin) return;
+		if (!isKnownSkin(currentSkin)) {
+			$skin.val('');
+			clearStoredSkin();
+		}
+	}
+
+	function getPlayableSkin() {
+		var currentSkin = sanitizeSkin($skin.val());
+		if (!currentSkin || !isKnownSkin(currentSkin)) return '';
+		return currentSkin;
+	}
+
 	$.get('skinList.txt', function(data, status) {
 		if (status === 'success') {
-			var skins = data.split(',');
+			var skins = normalizeSkinList(data);
 			if (skins.length === 0) return;
 			knownSkins = skins;
+			rebuildKnownSkinsSet();
+			syncSkinInputWithAvailableSkins();
 
 			$('#gallery-btn').css('display', 'inline-block');
 
@@ -43,17 +117,15 @@ $(function() {
 
 				for (var p of fp) bannedIdent.push(p);
 
-				try {
-					agarv1ident = localStorage.getItem('agarv1ident');
-				} catch (e) {}
+				playerIdent = getStoredValue(storageKeys.ident, legacyKeys.ident);
 
-				FP.then(function (fp) { return fp.get() }).then(function(result) {
-					localStorage.setItem('agarv1ident', result.visitorId);
+				FP.then(function(fp) { return fp.get(); }).then(function(result) {
+					setStoredValue(storageKeys.ident, result.visitorId);
 
 					var ban = false;
 
 					bannedIdent.forEach(function(val) {
-						if (agarv1ident === val) {
+						if (playerIdent === val) {
 							ban = true;
 						}
 					});
@@ -61,36 +133,30 @@ $(function() {
 					if (ban) {
 						$('#chat_textbox').hide();
 						$('#overlays').hide();
-						$('#connecting div').html('<h3 style="text-align: center">You are banned 😭</h3><hr class="top" /><p style="text-align: center">You are banned from the game because you broke the rules either spamming the chat or while uploading custom skins.</p><a class="text-center" style="display: block; color: red;" href="https://discord.gg/emupedia-510149138491506688" target="_blank">Join us on Discord!</a><h1 style="text-align: center;">Your unban code is<br /><br />' + btoa(agarv1ident).replace(/(.{10})/g, "$1<br />") + '</h1>');
+						$('#connecting div').html('<h3 style="text-align: center">You are banned</h3><hr class="top" /><p style="text-align: center">You are banned from Blobz because of repeated rule violations.</p>' + getSupportMessage() + '<h1 style="text-align: center;">Your unban code is<br /><br />' + btoa(playerIdent).replace(/(.{10})/g, "$1<br />") + '</h1>');
 						$('#connecting').show();
 					} else {
 						$('#overlays').show();
-
-						/*grecaptcha.ready(function() {
-							grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(function(token) {
-								connect('wss://agar.' + location + '/ws1/?token=' + token);
-							});
-						});*/
-
-						connect('wss://agar.' + location + '/ws1/');
+						connect(socketUrl);
 
 						clearInterval(interval);
 						interval = setInterval(function() {
-							FP.then(function (fp) { return fp.get() }).then(function (result) {
-								localStorage.setItem('agarv1ident', result.visitorId);
+							FP.then(function(fp) { return fp.get(); }).then(function(result) {
+								setStoredValue(storageKeys.ident, result.visitorId);
 
-								let ban = false;
+								var liveIdent = getStoredValue(storageKeys.ident, legacyKeys.ident);
+								var liveBan = false;
 
 								bannedIdent.forEach(function(val) {
-									if (agarv1ident === val) {
-										ban = true;
+									if (liveIdent === val) {
+										liveBan = true;
 									}
 								});
 
-								if (ban) {
+								if (liveBan) {
 									$('#chat_textbox').hide();
 									$('#overlays').hide();
-									$('#connecting div').html('<h3 style="text-align: center">You are banned 😭</h3><hr class="top" /><p style="text-align: center">You are banned from the game because you broke the rules either spamming the chat or while uploading custom skins.</p><a class="text-center" style="display: block; color: red;" href="https://discord.gg/emupedia-510149138491506688" target="_blank">Join us on Discord!</a><h1 style="text-align: center;">Your unban code is<br /><br />' + btoa(agarv1ident).replace(/(.{10})/g, "$1<br />") + '</h1>');
+									$('#connecting div').html('<h3 style="text-align: center">You are banned</h3><hr class="top" /><p style="text-align: center">You are banned from Blobz because of repeated rule violations.</p>' + getSupportMessage() + '<h1 style="text-align: center;">Your unban code is<br /><br />' + btoa(liveIdent).replace(/(.{10})/g, "$1<br />") + '</h1>');
 									$('#connecting').show();
 								}
 							});
@@ -99,32 +165,18 @@ $(function() {
 				});
 			}).error(function() {
 				$('#overlays').show();
-
-				/*grecaptcha.ready(function() {
-					grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(function (token) {
-						connect('wss://agar.' + location + '/ws1/?token=' + token);
-					});
-				});*/
-
-				connect('wss://agar.' + location + '/ws1/');
+				connect(socketUrl);
 			});
 		}
 	}).error(function() {
 		$('#overlays').show();
-
-		/*grecaptcha.ready(function() {
-			grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(function(token) {
-				connect('wss://agar.' + location + '/ws1/?token=' + token);
-			});
-		});*/
-
-		connect('wss://agar.' + location + '/ws1/');
+		connect(socketUrl);
 	});
 
 	$('input').keypress(function(e) {
-		if (e.which === '13') {
+		if (e.which === 13) {
 			if (!isSpectating) {
-				setNick('<' + sanitizeSkin($skin.val()) + '|' + (agarv1ident ? agarv1ident : '') + '>' + sanitizeNick($nick.val()));
+				setNick('<' + getPlayableSkin() + '|' + (playerIdent ? playerIdent : '') + '>' + sanitizeNick($nick.val()));
 			}
 		}
 	});
@@ -141,8 +193,8 @@ $(function() {
 			for (var skin in sortedSkins) {
 				if (sortedSkins[skin] !== '') {
 					c += '<li class="skin" data-skin="' + sortedSkins[skin] + '">';
-					c +=	'<img class="circular" loading="lazy" src="./skins/' + sortedSkins[skin] + '.png">';
-					c +=	'<h4 class="skinName">' + sortedSkins[skin] + '</h4>';
+					c += '<img class="circular" loading="lazy" src="./skins/' + sortedSkins[skin] + '.png">';
+					c += '<h4 class="skinName">' + sortedSkins[skin] + '</h4>';
 					c += '</li>';
 				}
 			}
@@ -152,7 +204,7 @@ $(function() {
 			$('li.skin').off('click').on('click', function() {
 				var skin = $(this).data('skin');
 				$skin.val(sanitizeSkin(skin));
-				localStorage.setItem('agarv1skin', skin);
+				setStoredValue(storageKeys.skin, skin);
 				$gallery.hide();
 			});
 		}
@@ -160,7 +212,7 @@ $(function() {
 		$gallery.css('display', 'flex');
 
 		return false;
-	})
+	});
 
 	$gallery.off('click').on('click', function(e) {
 		if (e.target === $(this).get(0)) {
@@ -170,9 +222,7 @@ $(function() {
 
 	$('#settings-btn').off('click').on('click', function(e) {
 		e.preventDefault();
-
 		$('#settings').toggle();
-
 		return false;
 	});
 
@@ -181,8 +231,8 @@ $(function() {
 
 		var form = $('#form').get(0);
 
-		if (form && typeof form['reportValidity'] === 'function' && form.reportValidity()) {
-			setNick('<' + sanitizeSkin($skin.val()) + '|' + (agarv1ident ? agarv1ident : '') + '>' + sanitizeNick($nick.val()));
+		if (form && typeof form.reportValidity === 'function' && form.reportValidity()) {
+			setNick('<' + getPlayableSkin() + '|' + (playerIdent ? playerIdent : '') + '>' + sanitizeNick($nick.val()));
 		}
 
 		return false;
@@ -190,18 +240,24 @@ $(function() {
 
 	$('#spectate-btn').off('click').on('click', function(e) {
 		e.preventDefault();
-
 		spectate();
-
 		return false;
 	});
 
 	$nick.off('input change blur').on('input change blur', function(e) {
-		localStorage.setItem('agarv1nick', e.target.value);
+		setStoredValue(storageKeys.nick, e.target.value);
 	});
 
 	$skin.off('input change blur').on('input change blur', function(e) {
-		localStorage.setItem('agarv1skin', e.target.value);
+		var sanitizedSkin = sanitizeSkin(e.target.value);
+		if (sanitizedSkin !== e.target.value) {
+			$skin.val(sanitizedSkin);
+		}
+		if (sanitizedSkin && !isKnownSkin(sanitizedSkin)) {
+			clearStoredSkin();
+			return;
+		}
+		setStoredValue(storageKeys.skin, sanitizedSkin);
 	});
 
 	$('#chat_textbox').off('paste').on('paste', function(e) {
@@ -209,6 +265,7 @@ $(function() {
 		return false;
 	});
 
-	$nick.val(localStorage.getItem('agarv1nick') || '');
-	$skin.val(localStorage.getItem('agarv1skin') || '');
+	$nick.val(getStoredValue(storageKeys.nick, legacyKeys.nick));
+	$skin.val(getStoredValue(storageKeys.skin, legacyKeys.skin));
+	syncSkinInputWithAvailableSkins();
 });

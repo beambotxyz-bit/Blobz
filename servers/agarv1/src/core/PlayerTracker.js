@@ -340,6 +340,11 @@ module.exports = class PlayerTracker {
       this.socket.packetHandler.pressSpace = false;
     }
 
+    if (this.socket.packetHandler.pressC) { // Max split x16
+      this.gameServer.maxSplitCells(this, 16);
+      this.socket.packetHandler.pressC = false;
+    }
+
     if (this.socket.packetHandler.pressW) { // Eject mass
       if (this.op.pressW(this.gameServer, this)) this.gameServer.gameMode.pressW(this.gameServer, this);
       this.socket.packetHandler.pressW = false;
@@ -414,7 +419,7 @@ module.exports = class PlayerTracker {
 
         this.visibleNodes = newVisible;
         // Reset Ticks
-        this.tickViewBox = 2;
+        this.tickViewBox = this.spectate ? 0 : 1;
       }
     } else {
       this.tickViewBox--;

@@ -3,7 +3,9 @@
 (function (wHandle, wjQuery) {
 	var SKIN_URL = "./skins/";
 
-	var touchX, touchY, touchable = 'ontouchstart' in window, touches = [];
+	var touchX, touchY, touchable = false, touches = [];
+	var pointerInitialized = false;
+	var lastTouchInputTime = 0;
 
 	var leftTouchID = -1,
 		leftTouchPos = new Vector2(0, 0),
@@ -14,6 +16,272 @@
 	var lastSplitTime = 0;
 	var minFeedDelay = 50;
 	var minSplitDelay = 50;
+	var lastMaxSplitTime = 0;
+	var minMaxSplitDelay = 120;
+	var feedHoldInterval = null;
+	var feedHoldTimeout = null;
+	var splitHoldInterval = null;
+	var splitHoldTimeout = null;
+	var feedTouchID = -1;
+	var splitTouchID = -1;
+	var feedHoldStartDelay = 220;
+	var splitHoldStartDelay = 280;
+	var defaultAudioSettings = {
+		playSounds: true,
+		soundsVolume: .45,
+		playMusic: false,
+		musicVolume: .28
+	};
+
+	function Sound(src, volume, maximum) {
+		this.src = src;
+		this.volume = typeof volume === "number" ? volume : .5;
+		this.maximum = typeof maximum === "number" ? maximum : Infinity;
+		this.elms = [];
+	}
+
+	Sound.prototype.play = function(volume) {
+		var toPlay;
+		var playPromise;
+		if (typeof volume === "number") this.volume = volume;
+		toPlay = null;
+		for (var i = 0; i < this.elms.length; i++) {
+			if (this.elms[i].paused) {
+				toPlay = this.elms[i];
+				break;
+			}
+		}
+		if (!toPlay) toPlay = this.add();
+		toPlay.currentTime = 0;
+		toPlay.volume = this.volume;
+		playPromise = toPlay.play();
+		if (playPromise && typeof playPromise.catch === "function") playPromise.catch(function() {});
+	};
+
+	Sound.prototype.add = function() {
+		var elm;
+		if (this.elms.length >= this.maximum) return this.elms[0];
+		elm = new Audio(this.src);
+		elm.preload = "auto";
+		this.elms.push(elm);
+		return elm;
+	};
+
+	var pelletSound = new Sound("sound/pellet.mp3", defaultAudioSettings.soundsVolume, 10);
+	var eatSound = new Sound("sound/eat.mp3", defaultAudioSettings.soundsVolume, 10);
+	var backgroundMusic = null;
+	var audioUnlocked = false;
+
+	function parseToggle(value, fallback) {
+		if (typeof value === "boolean") return value;
+		if (typeof value === "string") {
+			if (value === "true") return true;
+			if (value === "false") return false;
+		}
+		return fallback;
+	}
+
+	function clampVolume(value, fallback) {
+		var parsed = parseFloat(value);
+		if (isNaN(parsed)) parsed = fallback;
+		if (isNaN(parsed)) parsed = 0;
+		if (0 > parsed) return 0;
+		if (1 < parsed) return 1;
+		return parsed;
+	}
+
+	function readStoredSettings() {
+		var rawSettings;
+		if (!wHandle.localStorage) return {};
+		rawSettings = wHandle.localStorage.settings;
+		if (!rawSettings) return {};
+		try {
+			return JSON.parse(rawSettings) || {};
+		} catch (error) {
+			return {};
+		}
+	}
+
+	function persistAudioSettings() {
+		var settings;
+		if (!wHandle.localStorage) return;
+		settings = readStoredSettings();
+		settings.playSounds = !!playSounds;
+		settings.soundsVolume = soundsVolume;
+		settings.playMusic = !!playMusic;
+		settings.musicVolume = musicVolume;
+		wHandle.localStorage.settings = JSON.stringify(settings);
+	}
+
+	function formatVolumeLabel(volume) {
+		return Math.round(clampVolume(volume, 0) * 100) + "%";
+	}
+
+	function updateAudioControls() {
+		var soundToggle = document.getElementById("csounds");
+		var soundSlider = document.getElementById("sound-volume");
+		var soundLabel = document.getElementById("sound-volume-value");
+		var soundRow = document.getElementById("sound-effects-row");
+		var musicToggle = document.getElementById("cmusic");
+		var musicSlider = document.getElementById("music-volume");
+		var musicLabel = document.getElementById("music-volume-value");
+		var musicRow = document.getElementById("music-row");
+
+		if (soundToggle) soundToggle.checked = !!playSounds;
+		if (soundSlider) {
+			soundSlider.value = soundsVolume.toFixed(2);
+			soundSlider.disabled = !playSounds;
+		}
+		if (soundLabel) soundLabel.textContent = formatVolumeLabel(soundsVolume);
+		if (soundRow) soundRow.classList.toggle("is-disabled", !playSounds);
+
+		if (musicToggle) musicToggle.checked = !!playMusic;
+		if (musicSlider) {
+			musicSlider.value = musicVolume.toFixed(2);
+			musicSlider.disabled = !playMusic;
+		}
+		if (musicLabel) musicLabel.textContent = formatVolumeLabel(musicVolume);
+		if (musicRow) musicRow.classList.toggle("is-disabled", !playMusic);
+
+		pelletSound.volume = soundsVolume;
+		eatSound.volume = soundsVolume;
+		if (backgroundMusic) backgroundMusic.volume = musicVolume;
+	}
+
+	function updateMacroControls() {
+		var splitMacroToggle = document.getElementById("splitmacro");
+		var feedMacroToggle = document.getElementById("feedmacro");
+		if (splitMacroToggle) splitMacroToggle.checked = !!sMacro;
+		if (feedMacroToggle) feedMacroToggle.checked = !!wMacro;
+	}
+
+	function getFeedHoldRepeatDelay() {
+		return wMacro ? 90 : Math.max(150, Math.round(1000 / 7));
+	}
+
+	function getSplitHoldRepeatDelay() {
+		return sMacro ? 220 : Math.max(220, Math.round(1000 / 7));
+	}
+
+	function loadAudioSettings() {
+		var storedSettings = readStoredSettings();
+		playSounds = parseToggle(storedSettings.playSounds, playSounds);
+		soundsVolume = clampVolume(storedSettings.soundsVolume, soundsVolume);
+		playMusic = parseToggle(storedSettings.playMusic, playMusic);
+		musicVolume = clampVolume(storedSettings.musicVolume, musicVolume);
+		updateAudioControls();
+	}
+
+	function syncMusicPlayback() {
+		var shouldPause = !audioUnlocked || !playMusic || hasOverlay;
+		var playPromise;
+		if (!backgroundMusic) return;
+		if (typeof document.hidden === "boolean" && document.hidden) shouldPause = true;
+		backgroundMusic.volume = musicVolume;
+		if (shouldPause) {
+			if (!backgroundMusic.paused) backgroundMusic.pause();
+			return;
+		}
+		playPromise = backgroundMusic.play();
+		if (playPromise && typeof playPromise.catch === "function") playPromise.catch(function() {});
+	}
+
+	function unlockAudio() {
+		if (!audioUnlocked) {
+			audioUnlocked = true;
+			try {
+				pelletSound.add();
+				eatSound.add();
+			} catch (error) {}
+		}
+		syncMusicPlayback();
+	}
+
+	function playConsumeSound(killedNode) {
+		var isPelletLike;
+		if (!audioUnlocked || !playSounds || !killedNode) return;
+		isPelletLike = !killedNode.isVirus && killedNode.size <= 20;
+		(isPelletLike ? pelletSound : eatSound).play(soundsVolume);
+	}
+
+	function resetPointerState() {
+		var centerX = canvasWidth ? canvasWidth / 2 : wHandle.innerWidth / 2;
+		var centerY = canvasHeight ? canvasHeight / 2 : wHandle.innerHeight / 2;
+		rawMouseX = centerX;
+		rawMouseY = centerY;
+		X = nodeX;
+		Y = nodeY;
+		oldX = X;
+		oldY = Y;
+		pointerInitialized = false;
+	}
+
+	function triggerMaxSplit() {
+		var currentTime = Date.now();
+		if (currentTime - lastMaxSplitTime < minMaxSplitDelay) return false;
+		sendMouseMove();
+		sendUint8(25);
+		lastMaxSplitTime = currentTime;
+		return true;
+	}
+
+	function triggerFeed() {
+		var currentTime = Date.now();
+		if (currentTime - lastFeedTime < minFeedDelay) return false;
+		sendMouseMove();
+		sendUint8(21);
+		lastFeedTime = currentTime;
+		return true;
+	}
+
+	function triggerSplit() {
+		var currentTime = Date.now();
+		if (currentTime - lastSplitTime < minSplitDelay) return false;
+		sendMouseMove();
+		sendUint8(17);
+		lastSplitTime = currentTime;
+		return true;
+	}
+
+	function stopFeedHold() {
+		if (feedHoldTimeout) {
+			clearTimeout(feedHoldTimeout);
+			feedHoldTimeout = null;
+		}
+		if (feedHoldInterval) {
+			clearInterval(feedHoldInterval);
+			feedHoldInterval = null;
+		}
+		feedTouchID = -1;
+	}
+
+	function stopSplitHold() {
+		if (splitHoldTimeout) {
+			clearTimeout(splitHoldTimeout);
+			splitHoldTimeout = null;
+		}
+		if (splitHoldInterval) {
+			clearInterval(splitHoldInterval);
+			splitHoldInterval = null;
+		}
+		splitTouchID = -1;
+	}
+
+	function startFeedHold() {
+		stopFeedHold();
+		triggerFeed();
+		feedHoldTimeout = setTimeout(function() {
+			feedHoldInterval = setInterval(triggerFeed, getFeedHoldRepeatDelay());
+		}, feedHoldStartDelay);
+	}
+
+	function startSplitHold() {
+		stopSplitHold();
+		triggerSplit();
+		splitHoldTimeout = setTimeout(function() {
+			splitHoldInterval = setInterval(triggerSplit, getSplitHoldRepeatDelay());
+		}, splitHoldStartDelay);
+	}
 
 	function gameLoop() {
 		ma = true;
@@ -23,13 +291,18 @@
 
 		mainCanvas = nCanvas = document.getElementById("canvas");
 		ctx = mainCanvas.getContext("2d");
+		loadAudioSettings();
+		updateMacroControls();
+		document.addEventListener("visibilitychange", syncMusicPlayback);
 
 		mainCanvas.onmousemove = function (event) {
 			if (typeof event['isTrusted'] !== 'boolean' || event['isTrusted'] === false) return;
-			if (touchable) return;
+			if (Date.now() - lastTouchInputTime < 500) return;
 
+			touchable = false;
 			rawMouseX = event.clientX;
 			rawMouseY = event.clientY;
+			pointerInitialized = true;
 			mouseCoordinateChange()
 		};
 
@@ -55,25 +328,23 @@
 			isTyping = true;
 		};
 
-		var spacePressed = false, qPressed = false, ePressed = false, rPressed = false, tPressed = false, wPressed = false;
+		var spacePressed = false, cPressed = false, qPressed = false, ePressed = false, rPressed = false, tPressed = false, wPressed = false;
 
 		wHandle.onkeydown = function (event) {
 			if (typeof event['isTrusted'] !== 'boolean' || event['isTrusted'] === false) return;
 
-			var currentTime = Date.now();
-
 			switch (event.keyCode) {
 				case 32: // split
-					if (currentTime - lastSplitTime < minSplitDelay) {
-						return;
-					}
-
 					if ((!spacePressed) && (!isTyping)) {
-						sendMouseMove();
-						sendUint8(17);
-						if (!sMacro) spacePressed = true;
-						lastSplitTime = currentTime;
-						//console.log("SPACE pressed")
+						startSplitHold();
+						spacePressed = true;
+					}
+					break;
+				case 67: // max split x16
+					if ((!cPressed) && (!isTyping)) {
+						if (triggerMaxSplit()) {
+							cPressed = true;
+						}
 					}
 					break;
 				case 81: // key q pressed
@@ -84,16 +355,9 @@
 					}
 					break;
 				case 87: // eject mass
-					if (currentTime - lastFeedTime < minFeedDelay) {
-						return;
-					}
-
 					if ((!wPressed) && (!isTyping)) {
-						sendMouseMove();
-						sendUint8(21);
-						if (!wMacro) wPressed = true;
-						lastFeedTime = currentTime;
-						//console.log("W pressed")
+						startFeedHold();
+						wPressed = true;
 					}
 					break;
 				case 69: // e key
@@ -148,9 +412,14 @@
 
 			switch (event.keyCode) {
 				case 32:
+					stopSplitHold();
 					spacePressed = false;
 					break;
+				case 67:
+					cPressed = false;
+					break;
 				case 87:
+					stopFeedHold();
 					wPressed = false;
 					break;
 				case 69:
@@ -172,25 +441,19 @@
 		};
 		wHandle.onblur = function (event) {
 			sendUint8(19);
-			wPressed = qPressed = spacePressed = false
+			stopFeedHold();
+			stopSplitHold();
+			wPressed = qPressed = spacePressed = cPressed = false
 		};
 		wHandle.onresize = canvasResize;
 		canvasResize();
+		resetPointerState();
 		if (wHandle.requestAnimationFrame) {
 			wHandle.requestAnimationFrame(redrawGameScene);
 		} else {
 			setInterval(drawGameScene, 1E3 / 60);
 		}
-		mouseinterval = setInterval(sendMouseMove, 40);
-		setInterval(function() {
-			try {
-				clearInterval(mouseinterval)
-			} catch (e) {
-				console.log("e at 204");
-			}
-			mouseinterval = setInterval(sendMouseMove, 40);
-
-		}, 5000);
+		mouseinterval = setInterval(sendMouseMove, 25);
 		if (w) {
 			wjQuery("#region").val(w);
 		}
@@ -224,6 +487,8 @@
 
 	function onTouchStart(e) {
 		if (typeof e['isTrusted'] !== 'boolean' || e['isTrusted'] === false) return;
+		touchable = true;
+		lastTouchInputTime = Date.now();
 
 		for (var i = 0; i < e.changedTouches.length; i++) {
 			var touch = e.changedTouches[i];
@@ -238,29 +503,13 @@
 			var size = ~~(canvasWidth / 10);
 
 			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - size)) {
-				// Rate limiting for touch split to prevent spam
-				var currentTime = Date.now();
-				if (currentTime - lastSplitTime >= minSplitDelay) {
-					sendMouseMove();
-					sendUint8(17); //split
-					lastSplitTime = currentTime;
-					console.log("Touch split pressed");
-				} else {
-					console.log("Touch split rate limited - too fast");
-				}
+				startSplitHold();
+				splitTouchID = touch.identifier;
 			}
 
 			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - 2 * size - 10) && (touch.clientY < canvasHeight - size - 10)) {
-				// Rate limiting for touch eject to prevent spam
-				var currentTime = Date.now();
-				if (currentTime - lastFeedTime >= minFeedDelay) {
-					sendMouseMove();
-					sendUint8(21); //eject
-					lastFeedTime = currentTime;
-					console.log("Touch eject pressed");
-				} else {
-					console.log("Touch eject rate limited - too fast");
-				}
+				startFeedHold();
+				feedTouchID = touch.identifier;
 			}
 
 			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - 3 * size - 20) && (touch.clientY < canvasHeight - 2 * size - 30)) {
@@ -272,6 +521,10 @@
 					closeFullscreen();
 				}
 			}
+
+			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - 4 * size - 30) && (touch.clientY < canvasHeight - 3 * size - 30)) {
+				triggerMaxSplit();
+			}
 		}
 		touches = e.touches;
 	}
@@ -281,6 +534,7 @@
 		e.preventDefault();
 
 		touchable = true;
+		lastTouchInputTime = Date.now();
 
 		if (typeof e['isTrusted'] !== 'boolean' || e['isTrusted'] === false) return;
 
@@ -292,6 +546,7 @@
 				leftVector.minusEq(leftTouchStartPos);
 				rawMouseX = leftVector.x * 3 + canvasWidth / 2;
 				rawMouseY = leftVector.y * 3 + canvasHeight / 2;
+				pointerInitialized = true;
 				mouseCoordinateChange();
 				sendMouseMove();
 			}
@@ -307,11 +562,21 @@
 
 		for (var i = 0; i < e.changedTouches.length; i++) {
 			var touch = e.changedTouches[i];
+			if (splitTouchID === touch.identifier) {
+				stopSplitHold();
+			}
+			if (feedTouchID === touch.identifier) {
+				stopFeedHold();
+			}
 			if (leftTouchID === touch.identifier) {
 				leftTouchID = -1;
 				leftVector.reset(0, 0);
-				break;
+				resetPointerState();
 			}
+		}
+		if (!e.touches.length) {
+			stopFeedHold();
+			stopSplitHold();
 		}
 	}
 
@@ -368,10 +633,12 @@
 	}
 
 	function hideOverlays() {
+		resetPointerState();
 		hasOverlay = false;
 		wjQuery("#adsBottom").hide();
 		wjQuery("#overlays").hide();
-		Ha()
+		Ha();
+		syncMusicPlayback();
 	}
 
 	function setRegion(a) {
@@ -388,10 +655,12 @@
 	}
 
 	function showOverlays(arg) {
+		resetPointerState();
 		hasOverlay = true;
 		userNickName = null;
 		wjQuery("#overlays").fadeIn(arg ? 200 : 3E3);
-		arg || wjQuery("#adsBottom").fadeIn(3E3)
+		arg || wjQuery("#adsBottom").fadeIn(3E3);
+		syncMusicPlayback();
 	}
 
 	function Ha() {
@@ -403,8 +672,9 @@
 		if (typeof grecaptcha !== 'undefined') {
 			grecaptcha.ready(() => {
 				grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(token => {
-					var location = ~window.location.hostname.indexOf('emupedia.net') ? 'emupedia.net' : (~window.location.hostname.indexOf('emupedia.org') ? 'emupedia.org' : (~window.location.hostname.indexOf('emupedia.games') ? 'emupedia.games' : (~window.location.hostname.indexOf('emuos.net') ? 'emuos.net' : (~window.location.hostname.indexOf('emuos.org') ? 'emuos.org' : (~window.location.hostname.indexOf('emuos.games') ? 'emuos.games' : 'emupedia.net')))));
-					wsConnect('wss://agar.' + location + '/ws1/?token=' + token);
+					var socketHost = window.location.hostname || '127.0.0.1';
+					var socketUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + socketHost + ':3000/ws1/';
+					wsConnect(socketUrl + '?token=' + token);
 				});
 			});
 		}
@@ -436,6 +706,7 @@
 		leaderBoard = [];
 		mainCanvas = teamScores = null;
 		userScore = 0;
+		resetPointerState();
 		//console.log('Connecting to ' + wsUrl + '...');
 		ws = new WebSocket(wsUrl);
 		ws.binaryType = 'arraybuffer';
@@ -591,6 +862,7 @@
 					nodeX = posX;
 					nodeY = posY;
 					viewZoom = posSize;
+					resetPointerState();
 				}
 				break;
 			case 99:
@@ -768,11 +1040,12 @@
 		if (Data.instructions) wjQuery("#customins").text(clientData.instructions);
 		if (Data.customHTML) wjQuery("#customht").html(clientData.customHTML);
 		if (Data.maxName) wjQuery("#nick").attr("maxlength", clientData.maxName);
-		if (Data.wMacro) wMacro = (clientData.wMacro == 1) ? true : false;
-		if (Data.sMacro) sMacro = (clientData.sMacro == 1) ? true : false;
-		if (Data.eMacro) eMacro = (clientData.eMacro == 1) ? true : false;
-		if (Data.rMacro) rMacro = (clientData.rMacro == 1) ? true : false;
-		if (Data.qMacro) qMacro = (clientData.qMacro == 1) ? true : false;
+		if (Object.prototype.hasOwnProperty.call(Data, "wMacro")) wMacro = !!clientData.wMacro;
+		if (Object.prototype.hasOwnProperty.call(Data, "sMacro")) sMacro = !!clientData.sMacro;
+		if (Object.prototype.hasOwnProperty.call(Data, "eMacro")) eMacro = !!clientData.eMacro;
+		if (Object.prototype.hasOwnProperty.call(Data, "rMacro")) rMacro = !!clientData.rMacro;
+		if (Object.prototype.hasOwnProperty.call(Data, "qMacro")) qMacro = !!clientData.qMacro;
+		updateMacroControls();
 		if (Data.chat) {
 			if (clientData.chat < 2) wjQuery("#chat_textbox").hide(); else wjQuery("#chat_textbox").show();
 		}
@@ -806,6 +1079,9 @@
 				killedNode = nodes[view.getUint32(offset + 4, true)];
 			offset += 8;
 			if (killer && killedNode) {
+				if (-1 != playerCells.indexOf(killer) && -1 == playerCells.indexOf(killedNode)) {
+					playConsumeSound(killedNode);
+				}
 				killedNode.destroy();
 				killedNode.ox = killedNode.x;
 				killedNode.oy = killedNode.y;
@@ -899,7 +1175,7 @@
 
 	function sendMouseMove() {
 		var msg;
-		if (wsIsOpen()) {
+		if (wsIsOpen() && pointerInitialized) {
 			msg = rawMouseX - canvasWidth / 2;
 			var b = rawMouseY - canvasHeight / 2;
 			if (64 <= msg * msg + b * b && !(.01 > Math.abs(oldX - X) && .01 > Math.abs(oldY - Y))) {
@@ -1222,6 +1498,26 @@
 			var size = ~~(canvasWidth / 10);
 			ctx.drawImage(!document.fullscreenElement ? fullscreenIcon : fullscreenOffIcon, canvasWidth - size, canvasHeight - 3 * size - 20, size, size);
 		}
+
+		if (touchable) {
+			var size = ~~(canvasWidth / 10);
+			var buttonX = canvasWidth - size;
+			var buttonY = canvasHeight - 4 * size - 30;
+			ctx.save();
+			ctx.globalAlpha = .84;
+			ctx.fillStyle = "rgba(22, 32, 48, 0.92)";
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+			ctx.lineWidth = Math.max(2, ~~(size * 0.04));
+			ctx.fillRect(buttonX, buttonY, size, size);
+			ctx.strokeRect(buttonX, buttonY, size, size);
+			ctx.globalAlpha = 1;
+			ctx.fillStyle = "#FFFFFF";
+			ctx.font = "bold " + Math.max(14, ~~(size * 0.26)) + "px Ubuntu";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText("x16", buttonX + size / 2, buttonY + size / 2);
+			ctx.restore();
+		}
 	}
 
 	function calcUserScore() {
@@ -1343,8 +1639,8 @@
 		hideGrid = false,
 		ua = false,
 		userScore = 0,
-		sMacro = false,
-		wMacro = false,
+		sMacro = true,
+		wMacro = true,
 		qMacro = false,
 		eMacro = false,
 		rMacro = false,
@@ -1380,7 +1676,7 @@
 			defaultusername: "",
 			nickplaceholder: "",
 			leavemessage: "",
-			instructions: "Control your cell using the mouse, w for eject, space for split. Add &lt;skinname&gt; in your username for skins."
+			instructions: "Control your cell using the mouse, w for eject, space for split, and c for x16 max split. Add &lt;skinname&gt; in your username for skins."
 		},
 		showDarkTheme = false,
 		showMass = false,
@@ -1410,7 +1706,11 @@
 		splitIcon = new Image,
 		ejectIcon = new Image,
 		noRanking = false,
-		showBackgroundSectors = true;
+		showBackgroundSectors = true,
+		playSounds = defaultAudioSettings.playSounds,
+		soundsVolume = defaultAudioSettings.soundsVolume,
+		playMusic = defaultAudioSettings.playMusic,
+		musicVolume = defaultAudioSettings.musicVolume;
 	fullscreenIcon.src = 'img/fullscreen.png';
 	fullscreenOffIcon.src = 'img/fullscreen_off.png';
 	splitIcon.src = 'img/split.png';
@@ -1419,6 +1719,7 @@
 	var playerStat = null;
 	wHandle.isSpectating = false;
 	wHandle.setNick = function (arg) {
+		unlockAudio();
 		hideOverlays();
 		userNickName = arg;
 		sendNickName();
@@ -1435,10 +1736,12 @@
 		if (clientData.darkBG != 0 && clientData.darkBG != 3) showDarkTheme = arg
 	};
 	wHandle.setSplitMacro = function (arg) {
-		if (clientData.sMacro != 0 && clientData.sMacro != 3) sMacro = arg ? 1 : 0
+		if (clientData.sMacro != 0 && clientData.sMacro != 3) sMacro = !!arg;
+		updateMacroControls();
 	};
 	wHandle.setFeedMacro = function (arg) {
-		if (clientData.wMacro != 0 && clientData.wMacro != 3) wMacro = arg ? 1 : 0
+		if (clientData.wMacro != 0 && clientData.wMacro != 3) wMacro = !!arg;
+		updateMacroControls();
 	};
 	wHandle.setColors = function (arg) {
 		if (clientData.colors != 0 && clientData.colors != 3) showColor = arg
@@ -1452,6 +1755,28 @@
 	wHandle.setSmooth = function (arg) {
 		if (clientData.smooth != 0 && clientData.smooth != 3) smoothRender = arg ? 2 : .4
 	};
+	wHandle.setPlaySounds = function(arg) {
+		playSounds = !!arg;
+		updateAudioControls();
+		persistAudioSettings();
+	};
+	wHandle.setSoundsVolume = function(arg) {
+		soundsVolume = clampVolume(arg, soundsVolume);
+		updateAudioControls();
+		persistAudioSettings();
+	};
+	wHandle.setPlayMusic = function(arg) {
+		playMusic = !!arg;
+		updateAudioControls();
+		persistAudioSettings();
+		syncMusicPlayback();
+	};
+	wHandle.setMusicVolume = function(arg) {
+		musicVolume = clampVolume(arg, musicVolume);
+		updateAudioControls();
+		persistAudioSettings();
+		syncMusicPlayback();
+	};
 	wHandle.setHideChat = function (arg) {
 		hideChat = arg;
 		if (clientData.chat != 0 && clientData.chat != 3)
@@ -1462,6 +1787,7 @@
 			}
 	};
 	wHandle.spectate = function() {
+		unlockAudio();
 		userNickName = null;
 		wHandle.isSpectating = true;
 		sendUint8(1);
@@ -1666,6 +1992,11 @@
 				} else {
 					ctx.fillStyle = this.color;
 					ctx.strokeStyle = this.color;
+				}
+				var isSmallNeutralMass = !this.isVirus && !this.isAgitated && !this.name && !this.skin;
+				if (isSmallNeutralMass && this.size <= 30) {
+					ctx.lineWidth = this.size <= 12 ? 0 : 2;
+					b = true;
 				}
 				if (b) {
 					ctx.beginPath();

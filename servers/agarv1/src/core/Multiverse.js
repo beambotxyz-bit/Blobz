@@ -172,15 +172,15 @@ module.exports = class Multiverse {
     if (stage == 1) {
       if (str == "n" || str == "N") {
         this.newStage = 2;
-        console.log("[OgarUl] Skipped Tutorial (press enter)");
+        console.log("[Blobz] Skipped tutorial (press enter)");
         return;
       }
       var count = 0;
-      console.log("[Tutorial] Hello, today I will be teaching you how to use Ogar Unlimited.");
+      console.log("[Tutorial] Hello, today I will be teaching you how to use Blobz.");
       this.newStage = 1;
       var s = function() {
         if (count == 0) {
-          console.log("[Tutorial] Ogar Unlimited , when run, is playable using http://play.ogarul.tk")
+          console.log("[Tutorial] Blobz is playable from the local client once the server is running.")
         } else
         if (count == 1) {
           console.log("[Tutorial] You can type in your ip address and port in the input box or you may use it in this fashion: http://play.ogarul.tk/?ip=[yourip]:[port]")
@@ -192,7 +192,7 @@ module.exports = class Multiverse {
           console.log("[Tutorial] While playing, you may issue commands in the command prompt. Do the command \"help\" to see the list or look at the README for more info")
         } else
         if (count == 4) {
-          console.log("[Tutorial] Also, you may configure OgarUl by using the configs located in src/settings/.");
+          console.log("[Tutorial] You can configure Blobz by using the files located in src/settings/.");
         } else
         if (count == 5) {
           console.log("[Tutorial] You can configure things such as gamemodes, chat, speed and other things");
@@ -210,7 +210,7 @@ module.exports = class Multiverse {
           console.log("[Tutorial] Want more that 1 server? you can create multiple servers using different ports using the multiverse command")
         } else
         if (count == 10) {
-          console.log("[Tutorial] Do you know that Ogar Unlimited's function is basically unlimited? You can also add plugins!")
+          console.log("[Tutorial] Blobz also supports plugins if you want to extend the preserved server base.")
         } else
         if (count == 11) {
           console.log("[Tutorial] Do you also know that you can use skins? Do <skiname>yourname in the nickname box for that skin");
@@ -229,15 +229,15 @@ module.exports = class Multiverse {
         }
       }.bind(this), 1500)
     } else if (stage == 20) {
-      console.log("[OgarUl] Skipped Tutorial (press enter)");
+      console.log("[Blobz] Skipped tutorial (press enter)");
       this.newStage = 2;
       clearInterval(this.interval);
       return;
     } else if (stage == 2) {
-      console.log("[OgarUl] We will need to have some info beforehand.. (press enter)");
+      console.log("[Blobz] We will need some info beforehand.. (press enter)");
       this.newStage = 3
     } else if (stage == 3) {
-      console.log("[OgarUl] What is the language you prefer? Available: en (english) es (spanish)");
+      console.log("[Blobz] What is the language you prefer? Available: en (english) es (spanish)");
       this.newStage = 4;
     } else if (stage == 4) {
       try {
@@ -255,7 +255,7 @@ module.exports = class Multiverse {
         this.setlang(str)
         return;
       } catch (e) {
-        console.log("[OgarUl] That language does not exist! (src/locals/" + str + ".js does not exsist)");
+        console.log("[Blobz] That language does not exist! (src/locals/" + str + ".js does not exist)");
         return;
       }
     }
@@ -264,10 +264,10 @@ module.exports = class Multiverse {
     var create = function() {
       this.newStage = 1;
       this.writeTitle();
-      console.log("[OgarUL] Welcome to Ogar Unlimited!");
-      console.log("[OgarUl] We sensed that this is your first time! Welcome! Thank you for choosing OgarUL!");
-      console.log("[OgarUl] First, let us show you around a bit...");
-      console.log("[OgarUl] Press the ENTER key (or type N and press enter to skip tutorial)");
+      console.log("[Blobz] Welcome to Blobz!");
+      console.log("[Blobz] It looks like this is your first time here. Thanks for choosing Blobz.");
+      console.log("[Blobz] First, let us show you around a bit...");
+      console.log("[Blobz] Press the ENTER key (or type N and press enter to skip the tutorial)");
     }.bind(this);
     try {
       var data = fs.readFileSync(__dirname + '/../info.json', "utf8");

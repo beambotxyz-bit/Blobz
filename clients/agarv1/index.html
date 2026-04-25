@@ -8,7 +8,7 @@
 		<meta property="og:image:width" content="1200"/>
 		<meta property="og:image:height" content="630"/>
 		<meta property="og:type" content="website"/>
-		<title>Agar.io</title>
+		<title>Blobz</title>
 		<link id="fav" rel="icon" type="image/png" href="favicon-32x32.png"/>
 		<link href='https://fonts.googleapis.com/css?family=Ubuntu:700' rel='stylesheet' type='text/css'>
 		<link href="css/bootstrap-3.3.4.min.css" rel="stylesheet">
@@ -207,7 +207,7 @@
 	<body>
 		<div id="gallery" onclick="if (event.target === this) this.style.display = 'none';" style="display: none;">
 			<div id="gallery-content">
-				<div id="gallery-header">Skins</div>
+				<div id="gallery-header">Blobz Skins</div>
 				<div id="gallery-body"></div>
 			</div>
 		</div>
@@ -215,9 +215,9 @@
 			<div id="helloDialog">
 				<form id="form" role="form">
 					<div class="form-group">
-						<div><h2 id="title" class="text-center">Agar.io</h2></div>
+						<div><h2 id="title" class="text-center">Blobz</h2></div>
 						<hr class="top" />
-						<a class="text-center" style="display: block; color: red;" href="https://discord.gg/emupedia-510149138491506688" target="_blank">Join us on Discord if you have suggestions</a>
+						<div class="text-center" style="display: block; color: #3b6ea8;">Blobz early access build</div>
 					</div>
 					<div class="form-group">
 						<input id="nick" class="form-control" style="display: inline-block;" placeholder="Nick" maxlength="15" pattern="[a-zA-Z0-9_\- ]+" oninvalid="this.setCustomValidity('Only letters, numbers, spaces and \'_\' and \'-\') allowed')" onchange="try{setCustomValidity('')}catch(e){}" />
@@ -252,16 +252,16 @@
 				</div>
 				<hr />
 				<div id="footer">
-					<span class="text-muted">Have fun!</span>
+					<span class="text-muted">Grow smart. Stay alive.</span>
 				</div>
 			</div>
 		</div>
 
 		<div id="connecting" style="display:none; position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 201; background-color: rgba(0,0,0,0.5);">
 			<div style="width: 350px; background-color: #fff; margin: 100px auto; border-radius: 15px; padding: 5px 15px 5px 15px;">
-				<h3>Trying to connect...</h3><hr />
-				<a class="text-center" style="display: block; color: red;" href="https://discord.gg/emupedia-510149138491506688" target="_blank">Join us on Discord!</a>
-				<p>If you cannot connect to the servers, check if you have some antivirus or firewall blocking the connection.</p>
+				<h3>Connecting to Blobz...</h3><hr />
+				<div class="text-center" style="display: block; color: #3b6ea8;">Launching your local arena session</div>
+				<p>If you cannot connect, check whether your local Blobz server is running and whether a firewall is blocking the websocket connection.</p>
 			</div>
 		</div>
 
@@ -271,7 +271,7 @@
 			<input id="chat_textbox" maxlength="70" autocomplete="off" placeholder="Press Enter to chat!" type="text">
 		</form>
 
-		<div id="skins" style="display: none;" title="Skins List (Click Your Skin)"></div>
+		<div id="skins" style="display: none;" title="Blobz Skins"></div>
 
 		<script src="https://www.google.com/recaptcha/api.js?render=6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3"></script>
 		<script src="js/jquery-1.11.3.min.js"></script>
@@ -380,7 +380,7 @@
 
 									grecaptcha.ready(() => {
 										grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(token => {
-											connect('wss://agar.emupedia.net/ws1/?token=' + token);
+											connect((location.protocol === 'https:' ? 'wss://' : 'ws://') + (location.hostname || '127.0.0.1') + ':3000/ws1/?token=' + token);
 										});
 									});
 
@@ -412,7 +412,7 @@
 
 							grecaptcha.ready(() => {
 								grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(token => {
-									connect('wss://agar.emupedia.net/ws1/?token=' + token);
+									connect((location.protocol === 'https:' ? 'wss://' : 'ws://') + (location.hostname || '127.0.0.1') + ':3000/ws1/?token=' + token);
 								});
 							});
 						});
@@ -422,7 +422,7 @@
 
 					grecaptcha.ready(() => {
 						grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(token => {
-							connect('wss://agar.emupedia.net/ws1/?token=' + token);
+							connect((location.protocol === 'https:' ? 'wss://' : 'ws://') + (location.hostname || '127.0.0.1') + ':3000/ws1/?token=' + token);
 						});
 					});
 				});

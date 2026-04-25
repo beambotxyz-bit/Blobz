@@ -7,7 +7,7 @@ else
     exit 1
 fi
 
-echo "Setting up Ogar Unlimited, you will be asked for you sudo password."
+echo "Setting up Blobz, you will be asked for your sudo password."
 
 mkdir plugins
 
@@ -27,6 +27,6 @@ echo "Setting node to the current stable version..."
 sudo n 5.9.0               # set node to stable
 echo "Installing dependencies..."
 npm install                 # install all modules
-echo "Ogar Unlimited is ready to run!"
-echo "To start Ogar Unlimited type: ./start.sh"
+echo "Blobz is ready to run!"
+echo "To start Blobz type: ./start.sh"
 

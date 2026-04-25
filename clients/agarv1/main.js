@@ -360,7 +360,7 @@
 		if (typeof grecaptcha !== 'undefined') {
 			grecaptcha.ready(() => {
 				grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(token => {
-					wsConnect('wss://agar.emupedia.net/ws1/?token=' + token);
+					wsConnect((location.protocol === 'https:' ? 'wss://' : 'ws://') + (location.hostname || '127.0.0.1') + ':3000/ws1/?token=' + token);
 				});
 			});
 		}

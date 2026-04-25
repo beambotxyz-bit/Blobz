@@ -84,7 +84,7 @@ module.exports = class GeneratorService {
       mass = (size * size) / 100;
     }
     this.foodSpawned++;
-    let f = new Entity.Food(this.gameServer.getWorld().getNextNodeId(), null, utilities.getRandomPosition(this.config.borderRight, this.config.borderLeft, this.config.borderBottom, this.config.borderTop), mass, this.gameServer);
+    let f = new Entity.Food(this.gameServer.getWorld().getNextNodeId(), null, this.gameServer.getRandomPosition(this.gameServer.getEntityRadiusFromMass(mass)), mass, this.gameServer);
     if (this.config.playerOldColors == 1) {
       f.setColor(this.gameServer.getRandomColor());
     } else {
@@ -100,7 +100,7 @@ module.exports = class GeneratorService {
       let virusNodes = this.gameServer.getVirusNodes();
       if (virusNodes.length < this.config.virusMinAmount) {
         // Spawns a virus
-        let pos = utilities.getRandomPosition(this.config.borderRight, this.config.borderLeft, this.config.borderBottom, this.config.borderTop);
+        let pos = this.gameServer.getRandomPosition(this.gameServer.getEntityRadiusFromMass(this.config.virusStartMass));
         let virusSquareSize = (this.config.virusStartMass * 100) >> 0;
 
         // Check for players

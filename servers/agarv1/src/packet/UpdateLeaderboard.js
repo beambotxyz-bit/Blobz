@@ -1,164 +1,168 @@
-function UpdateLeaderboard(leaderboard, packetLB, ctxt) {
+function UpdateLeaderboard(leaderboard, packetLB, ctxt, options) {
   this.leaderboard = leaderboard;
   this.packetLB = packetLB;
-  this.ctxt = ctxt
+  this.ctxt = ctxt;
+  this.options = options || {};
 }
 
 module.exports = UpdateLeaderboard;
 
 UpdateLeaderboard.prototype.build = function () {
-  // First, calculate the size
   var lb = this.leaderboard;
   var bufferSize = 5;
   var validElements = 0;
 
+  function writeString(view, offset, value) {
+    var text = value || "";
+    for (var i = 0; i < text.length; i++) {
+      view.setUint16(offset, text.charCodeAt(i), true);
+      offset += 2;
+    }
+    view.setUint16(offset, 0, true);
+    return offset + 2;
+  }
+
+  function getEntryName(entry) {
+    if (!entry) return "";
+    if (typeof entry.getName === "function") return entry.getName() || "";
+    return entry.name || "";
+  }
+
+  function getEntryScore(entry) {
+    if (!entry) return 0;
+    if (typeof entry.getScore === "function") return entry.getScore(false) || 0;
+    return entry.score || 0;
+  }
+
+  function getEntryNodeId(entry) {
+    if (!entry || !entry.cells || !entry.cells[0]) return 0;
+    return entry.cells[0].nodeId || 0;
+  }
+
   switch (this.packetLB) {
     case 48: // Custom Text List
-      // Get size of packet
       for (var i = 0; i < lb.length; i++) {
-        if (typeof lb[i] == "undefined") {
-          continue;
-        }
+        if (typeof lb[i] == "undefined") continue;
 
         var item = lb[i];
-        bufferSize += 4; // Empty ID
-        bufferSize += item.length * 2; // String length
-        bufferSize += 2; // Name terminator
-
+        bufferSize += 4;
+        bufferSize += item.length * 2;
+        bufferSize += 2;
         validElements++;
+      }
+
+      var customBuf = new ArrayBuffer(bufferSize);
+      var customView = new DataView(customBuf);
+      customView.setUint8(0, 49, true);
+      customView.setUint32(1, validElements, true);
+
+      var customOffset = 5;
+      for (var j = 0; j < lb.length; j++) {
+        if (typeof lb[j] == "undefined") continue;
+        customView.setUint32(customOffset, 0, true);
+        customOffset += 4;
+        customOffset = writeString(customView, customOffset, lb[j]);
+      }
+      return customBuf;
+
+    case 49: { // FFA-type Packet (Personalized compact list)
+      var topLimit = this.options.topLimit > 0 ? this.options.topLimit : 5;
+      var allPlayers = Array.isArray(this.options.allPlayers) ? this.options.allPlayers : lb;
+      var viewer = this.options.viewer || null;
+      var topEntries = [];
+      var selfEntry = null;
+      var selfRank = 0;
+
+      for (var topIndex = 0; topIndex < lb.length && topEntries.length < topLimit; topIndex++) {
+        if (typeof lb[topIndex] == "undefined") continue;
+        topEntries.push({
+          entry: lb[topIndex],
+          rank: topIndex + 1,
+          score: getEntryScore(lb[topIndex]),
+          name: getEntryName(lb[topIndex])
+        });
+      }
+
+      if (viewer && allPlayers.length > 0) {
+        for (var rankIndex = 0; rankIndex < allPlayers.length; rankIndex++) {
+          var rankedPlayer = allPlayers[rankIndex];
+          if (!rankedPlayer) continue;
+          if (rankedPlayer === viewer || (viewer.pID && rankedPlayer.pID === viewer.pID)) {
+            selfEntry = rankedPlayer;
+            selfRank = rankIndex + 1;
+            break;
+          }
+        }
+      }
+
+      validElements = topEntries.length;
+      for (var sizeIndex = 0; sizeIndex < topEntries.length; sizeIndex++) {
+        bufferSize += 4; // node id
+        bufferSize += 2; // rank
+        bufferSize += 4; // score
+        bufferSize += topEntries[sizeIndex].name.length * 2;
+        bufferSize += 2; // terminator
+      }
+
+      bufferSize += 1; // has self row
+      if (selfEntry && selfRank > 0) {
+        var selfName = getEntryName(selfEntry);
+        bufferSize += 2; // self rank
+        bufferSize += 4; // self score
+        bufferSize += selfName.length * 2;
+        bufferSize += 2; // terminator
       }
 
       var buf = new ArrayBuffer(bufferSize);
       var view = new DataView(buf);
-
-      // Set packet data
-      view.setUint8(0, 49, true); // Packet ID
-      view.setUint32(1, validElements, true); // Number of elements
-      var offset = 5;
-
-      // Loop through strings
-      for (var i = 0; i < lb.length; i++) {
-        if (typeof lb[i] == "undefined") {
-          continue;
-        }
-
-        var item = lb[i];
-
-        view.setUint32(offset, 0, true);
-        offset += 4;
-
-        for (var j = 0; j < item.length; j++) {
-          view.setUint16(offset, item.charCodeAt(j), true);
-          offset += 2;
-        }
-
-        view.setUint16(offset, 0, true);
-        offset += 2;
-      }
-      return buf;
-      break;
-    case 49: // FFA-type Packet (List)
-      // Get size of packet
-      for (var i = 0; i < lb.length; i++) {
-        if (typeof lb[i] == "undefined") {
-          continue;
-        }
-
-        var item = lb[i];
-        bufferSize += 4; // Element ID
-        bufferSize += item.getName() ? item.getName().length * 2 : 0; // Name
-        bufferSize += 2; // Name terminator
-
-        validElements++;
-      }
-      var customtxt = this.ctxt;
-      var ok = true;
-      var newcustomtxt = [];
-      if (customtxt) {
-        for (var q in customtxt) {
-          if (ok === true) {
-            newcustomtxt[q] = customtxt[q];
-            ok = false;
-          } else {
-            newcustomtxt[q] = " " + customtxt[q];
-          }
-
-        }
-        customtxt = newcustomtxt;
-      }
-      for (var q in customtxt) {
-        if (customtxt[q]) {
-          bufferSize += 4;
-          bufferSize += customtxt[q].length * 2
-          bufferSize += 2;
-          validElements++;
-        }
-      }
-
-      var buf = new ArrayBuffer(bufferSize);
-      var view = new DataView(buf);
-
-      // Set packet data
-      view.setUint8(0, this.packetLB, true); // Packet ID
-      view.setUint32(1, validElements, true); // Number of elements
+      view.setUint8(0, this.packetLB, true);
+      view.setUint32(1, validElements, true);
 
       var offset = 5;
-      for (var i = 0; i < lb.length; i++) {
-        if (typeof lb[i] == "undefined") {
-          continue;
-        }
-
-        var item = lb[i];
-
-        var nodeID = 0; // Get node id of player's 1st cell
-        if (item.cells[0]) {
-          nodeID = item.cells[0].nodeId;
-        }
-
-        view.setUint32(offset, nodeID, true);
+      for (var writeIndex = 0; writeIndex < topEntries.length; writeIndex++) {
+        var topItem = topEntries[writeIndex];
+        view.setUint32(offset, getEntryNodeId(topItem.entry), true);
         offset += 4;
-
-        // Set name
-        var name = item.getName();
-        if (name) {
-          for (var j = 0; j < name.length; j++) {
-            view.setUint16(offset, name.charCodeAt(j), true);
-            offset += 2;
-          }
-        }
-
-        view.setUint16(offset, 0, true);
+        view.setUint16(offset, topItem.rank, true);
         offset += 2;
+        view.setUint32(offset, Math.max(0, Math.floor(topItem.score)), true);
+        offset += 4;
+        offset = writeString(view, offset, topItem.name);
       }
-      for (var q in customtxt) {
-        if (customtxt[q]) {
-          view.setUint32(offset, 0, true);
-          offset += 4;
-          for (var j = 0; j < customtxt[q].length; j++) {
-            view.setUint16(offset, customtxt[q].charCodeAt(j), true);
-            offset += 2
-          }
-          view.setUint16(offset, 0, true);
-        }
+
+      if (selfEntry && selfRank > 0) {
+        view.setUint8(offset, 1);
+        offset += 1;
+        view.setUint16(offset, selfRank, true);
+        offset += 2;
+        view.setUint32(offset, Math.max(0, Math.floor(getEntryScore(selfEntry))), true);
+        offset += 4;
+        offset = writeString(view, offset, getEntryName(selfEntry));
+      } else {
+        view.setUint8(offset, 0);
       }
+
       return buf;
+    }
+
     case 50: // Teams-type Packet (Pie Chart)
       validElements = lb.length;
-      bufferSize += (validElements * 4);
+      bufferSize += validElements * 4;
 
-      var buf = new ArrayBuffer(bufferSize);
-      var view = new DataView(buf);
+      var teamBuf = new ArrayBuffer(bufferSize);
+      var teamView = new DataView(teamBuf);
 
-      view.setUint8(0, this.packetLB, true); // Packet ID
-      view.setUint32(1, validElements, true); // Number of elements
+      teamView.setUint8(0, this.packetLB, true);
+      teamView.setUint32(1, validElements, true);
 
-      var offset = 5;
-      for (var i = 0; i < validElements; i++) {
-        view.setFloat32(offset, lb[i], true); // Number of elements
-        offset += 4;
+      var teamOffset = 5;
+      for (var teamIndex = 0; teamIndex < validElements; teamIndex++) {
+        teamView.setFloat32(teamOffset, lb[teamIndex], true);
+        teamOffset += 4;
       }
 
-      return buf;
+      return teamBuf;
+
     default:
       break;
   }

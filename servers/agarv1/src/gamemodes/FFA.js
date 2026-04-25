@@ -84,31 +84,30 @@ FFA.prototype.onServerInit = function (gameServer) {
 
 FFA.prototype.updateLB = function (gameServer) {
   var lb = gameServer.leaderboard;
-  // Loop through all clients
+  var allPlayers = [];
   var clients = gameServer.getClients();
+
   for (var i = 0; i < clients.length; i++) {
     if (typeof clients[i] == "undefined") {
       continue;
     }
 
     var player = clients[i].playerTracker;
-    var playerScore = player.getScore(true);
     if (player.cells.length <= 0) {
       continue;
     }
+    player.getScore(true);
+    allPlayers.push(player);
+  }
 
-    if (lb.length == 0) {
-      // Initial player
-      lb.push(player);
-    } else if (lb.length < gameServer.config.ffaMaxLB) {
-      this.leaderboardAddSort(player, lb);
-    } else {
-      // 10 in leaderboard already
-      if (playerScore > lb[gameServer.config.ffaMaxLB - 1].getScore(false)) {
-        lb.pop();
-        this.leaderboardAddSort(player, lb);
-      }
-    }
+  allPlayers.sort(function (a, b) {
+    return b.getScore(false) - a.getScore(false);
+  });
+
+  gameServer.fullLeaderboard = allPlayers.slice();
+
+  for (var j = 0; j < allPlayers.length && j < gameServer.config.ffaMaxLB; j++) {
+    lb.push(allPlayers[j]);
   }
 
   this.rankOne = lb[0];

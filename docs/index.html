@@ -130,6 +130,205 @@
 				background: rgba(0, 0, 0, .5)
 			}
 
+			#lb-hud {
+				position: absolute;
+				top: 12px;
+				left: 12px;
+				z-index: 150;
+				width: 46px;
+				min-height: 46px;
+			}
+
+			#lb-hud.is-hidden {
+				display: none;
+			}
+
+			#lb-hud.is-open {
+				width: min(226px, calc(100vw - 24px));
+			}
+
+			#lb-toggle {
+				position: relative;
+				z-index: 1;
+				width: 46px;
+				height: 46px;
+				padding: 0;
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				border-radius: 14px;
+				background: rgba(10, 14, 20, 0.84);
+				color: #f2f5fa;
+				cursor: pointer;
+				outline: none;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+				transition: background-color .18s ease, border-color .18s ease, transform .18s ease, opacity .16s ease;
+			}
+
+			#lb-toggle:hover,
+			#lb-toggle:focus-visible,
+			#lb-toggle.is-active {
+				background: rgba(17, 23, 31, 0.96);
+				border-color: rgba(255, 255, 255, 0.2);
+				transform: translateY(-1px);
+			}
+
+			.lb-trigger-icon {
+				font-size: 24px;
+				line-height: 1;
+			}
+
+			#lb-hud.is-open #lb-toggle {
+				opacity: 0;
+				pointer-events: none;
+				transform: scale(.92);
+			}
+
+			#lb-panel {
+				position: absolute;
+				top: 0;
+				left: 0;
+				display: none;
+				width: min(226px, calc(100vw - 24px));
+				max-height: min(54vh, 300px);
+				overflow: hidden;
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				border-radius: 14px;
+				background: rgba(7, 10, 15, 0.88);
+				box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+				color: #edf2f8;
+				font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+			}
+
+			#lb-panel.is-open {
+				display: block;
+			}
+
+			.lb-panel-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 8px;
+				padding: 8px 10px 7px;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+			}
+
+			.lb-panel-title {
+				font-size: 11px;
+				font-weight: 600;
+				letter-spacing: .1em;
+				text-transform: uppercase;
+				color: #f7fafc;
+			}
+
+			#lb-close {
+				width: 25px;
+				height: 25px;
+				padding: 0;
+				border: 1px solid rgba(255, 99, 99, 0.2);
+				border-radius: 8px;
+				background: rgba(32, 9, 13, 0.46);
+				color: rgba(255, 232, 232, 0.9);
+				font: 15px/1 "Segoe UI", sans-serif;
+				cursor: pointer;
+				outline: none;
+			}
+
+			#lb-close:hover,
+			#lb-close:focus-visible {
+				background: rgba(56, 15, 22, 0.74);
+				border-color: rgba(255, 99, 99, 0.34);
+			}
+
+			.lb-panel-body {
+				padding: 8px 10px 10px;
+				max-height: calc(min(54vh, 300px) - 40px);
+				overflow-y: auto;
+			}
+
+			#lb-list {
+				display: grid;
+				gap: 2px;
+			}
+
+			.lb-row {
+				display: grid;
+				grid-template-columns: 18px minmax(0, 1fr) auto;
+				align-items: center;
+				gap: 6px;
+				min-height: 22px;
+				padding: 1px 0;
+				font-size: 12px;
+				font-weight: 400;
+				color: rgba(236, 242, 248, 0.92);
+			}
+
+			.lb-rank {
+				color: rgba(236, 242, 248, 0.76);
+			}
+
+			.lb-rank.is-podium {
+				color: #ffd74f;
+			}
+
+			.lb-name {
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+
+			.lb-mass {
+				color: #37e3db;
+				text-align: right;
+				white-space: nowrap;
+			}
+
+			.lb-self-wrap {
+				margin-top: 7px;
+				padding-top: 7px;
+				border-top: 1px solid rgba(255, 255, 255, 0.06);
+			}
+
+			.lb-row.is-self {
+				margin: 0 -3px;
+				padding: 6px 7px;
+				border-radius: 9px;
+				background: rgba(255, 255, 255, 0.07);
+			}
+
+			#lb-empty {
+				display: none;
+				padding: 6px 0 2px;
+				font-size: 12px;
+				font-weight: 400;
+				color: rgba(236, 242, 248, 0.62);
+			}
+
+			.lb-panel-foot {
+				margin-top: 8px;
+			}
+
+			#lb-exit-btn {
+				width: 100%;
+				padding: 7px 10px;
+				border: 1px solid rgba(255, 88, 88, 0.18);
+				border-radius: 10px;
+				background: rgba(21, 10, 12, 0.42);
+				color: rgba(255, 234, 234, 0.88);
+				font: 600 12px/1 "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+				letter-spacing: .03em;
+				cursor: pointer;
+				outline: none;
+			}
+
+			#lb-exit-btn:hover,
+			#lb-exit-btn:focus-visible {
+				background: rgba(36, 12, 17, 0.78);
+				border-color: rgba(255, 88, 88, 0.34);
+			}
+
 			#title {
 				padding: 10px;
 			}
@@ -306,6 +505,53 @@
 					width: 48px;
 				}
 
+				#lb-hud {
+					top: 8px;
+					left: 8px;
+					width: 42px;
+					min-height: 42px;
+				}
+
+				#lb-hud.is-open {
+					width: min(208px, calc(100vw - 16px));
+				}
+
+				#lb-toggle {
+					width: 42px;
+					height: 42px;
+					border-radius: 13px;
+				}
+
+				.lb-trigger-icon {
+					font-size: 22px;
+				}
+
+				#lb-panel {
+					width: min(208px, calc(100vw - 16px));
+					max-height: min(52vh, 252px);
+					border-radius: 13px;
+				}
+
+				.lb-panel-head {
+					padding: 7px 9px 6px;
+				}
+
+				.lb-panel-body {
+					padding: 7px 9px 8px;
+					max-height: calc(min(52vh, 252px) - 36px);
+				}
+
+				.lb-row {
+					font-size: 11px;
+					gap: 5px;
+					min-height: 20px;
+				}
+
+				#lb-exit-btn {
+					padding: 7px 9px;
+					font-size: 11px;
+				}
+
 				#settings {
 					max-height: 44vh;
 				}
@@ -327,6 +573,32 @@
 			@media (max-height: 540px) {
 				#settings {
 					max-height: 34vh;
+				}
+			}
+
+			@media (max-height: 460px) {
+				#lb-panel {
+					width: min(208px, calc(100vw - 16px));
+					max-height: min(74vh, 244px);
+				}
+
+				.lb-panel-head {
+					padding: 7px 9px 6px;
+				}
+
+				.lb-panel-body {
+					padding: 7px 9px 8px;
+					max-height: calc(min(74vh, 244px) - 36px);
+				}
+
+				.lb-row {
+					min-height: 19px;
+					font-size: 11px;
+				}
+
+				#lb-exit-btn {
+					padding: 7px 9px;
+					font-size: 11px;
 				}
 			}
 		</style>
@@ -363,18 +635,13 @@
 					<div class="checkbox" id="settings" style="display:none;">
 						<div class="settings-grid" style="margin: 6px;">
 							<label><input id="cskin" onchange="setSkins(!$(this).is(':checked'));" type="checkbox" /> No skins</label>
-							<label><input id="cname" onchange="setNames(!$(this).is(':checked'));" type="checkbox" /> No names</label>
-							<label><input id="cdark" onchange="setDarkTheme($(this).is(':checked'));" type="checkbox" /> Dark Theme</label>
 							<label><input id="splitmacro" onchange="setSplitMacro($(this).is(':checked'));" type="checkbox" checked /> Split Macro</label>
 							<label><input id="feedmacro" onchange="setFeedMacro($(this).is(':checked'));" type="checkbox" checked /> Feed Macro</label>
 							<label><input id="ccolor" onchange="setColors($(this).is(':checked'));" type="checkbox" /> No colors</label>
 							<label><input id="cmass" onchange="setShowMass($(this).is(':checked'));" type="checkbox" /> Show mass</label>
 							<label><input id="cchat" onchange="setHideChat($(this).is(':checked'));" type="checkbox" /> Hide chat</label>
 							<label><input id="csmooth" onchange="setSmooth($(this).is(':checked'));" type="checkbox" /> Smooth Render</label>
-							<label><input id="cacid" onchange="setAcid($(this).is(':checked'));" type="checkbox"> Acid mode</label>
-							<label><input id="cgrid" onchange="setHideGrid($(this).is(':checked'));" type="checkbox" />Hide Grid</label>
-							<label><input id="cminimap" onchange="setMinimap($(this).is(':checked'));" type="checkbox" checked />Show Minimap</label>
-							<label><input id="cbgsectors" onchange="setBackgroundSectors($(this).is(':checked'));" type="checkbox" checked />Show Background Sectors</label>
+							<label><input id="cgrid" onchange="setHideGrid($(this).is(':checked'));" type="checkbox" />Hide Radar Grid</label>
 						</div>
 						<div class="settings-audio" style="margin: 6px;">
 							<div class="settings-heading">Audio</div>
@@ -414,6 +681,25 @@
 		</div>
 
 		<canvas height="600" id="canvas" width="800"></canvas>
+		<div id="lb-hud" class="is-hidden">
+			<button id="lb-toggle" type="button" aria-label="Open leaderboard" aria-expanded="false" aria-controls="lb-panel">
+				<span class="lb-trigger-icon" aria-hidden="true">&#127942;</span>
+			</button>
+			<div id="lb-panel" aria-label="Leaderboard panel">
+				<div class="lb-panel-head">
+					<div class="lb-panel-title">Leaderboard</div>
+					<button id="lb-close" type="button" aria-label="Close leaderboard">&times;</button>
+				</div>
+				<div class="lb-panel-body">
+					<div id="lb-list"></div>
+					<div id="lb-self" class="lb-self-wrap" style="display:none;"></div>
+					<div id="lb-empty">Waiting for players...</div>
+					<div class="lb-panel-foot">
+						<button id="lb-exit-btn" type="button">&times; Exit Game</button>
+					</div>
+				</div>
+			</div>
+		</div>
 
 		<form>
 			<input id="chat_textbox" maxlength="70" autocomplete="off" placeholder="Press Enter to chat!" type="text" />
@@ -424,7 +710,7 @@
 		<script src="js/jquery-2.1.4.min.js"></script>
 		<script src="js/fp.umd.min.js"></script>
 		<script src="js/vector2.js"></script>
-		<script src="js/main.js?v=32"></script>
+		<script src="js/main.js?v=50"></script>
 		<script src="js/interface.js?v=4"></script>
 	</body>
 </html>

@@ -65,6 +65,7 @@ module.exports = class GameServer {
     this.previousPacketStats = {};
 
     this.leaderboard = []; // leaderboard
+    this.fullLeaderboard = [];
     this.port = port;
     this.lb_packet = new ArrayBuffer(0); // Leaderboard packet
     this.bots = new BotLoader(this);
@@ -190,12 +191,14 @@ module.exports = class GameServer {
     };
 
     this.leaderboard = []; // leaderboard
+    this.fullLeaderboard = [];
     this.lb_packet = new ArrayBuffer(0); // Leaderboard packet
     this.largestClient = undefined;
 
     // Main loop tick
     this.time = +new Date;
     this.startTime = this.time;
+    this.gameTicks = 0;
     this.tick = 0; // 1 second ticks of mainLoop
     this.tickMain = 0; // 50 ms ticks, 20 of these = 1 leaderboard update
     this.tickSpawn = 0; // Used with spawning food
@@ -770,16 +773,12 @@ module.exports = class GameServer {
 
   clearLeaderBoard() {
     this.leaderboard = [];
+    this.fullLeaderboard = [];
   }
 
   getRandomSpawn() {
     // Random spawns for players
-    let pos;
-
-    // Get random spawn if no food cell is found
-    pos = this.getRandomPosition();
-
-    return pos;
+    return this.getRandomPosition(this.getEntityRadiusFromMass(this.config.playerStartMass));
   }
 
   beforeq(player) {
@@ -787,8 +786,86 @@ module.exports = class GameServer {
 
   }
 
-  getRandomPosition() {
-    return this.getWorld().getRandomPosition();
+  isCircularArena() {
+    return Number(this.config.circularArena) === 1;
+  }
+
+  getArenaCenter() {
+    return {
+      x: (this.config.borderLeft + this.config.borderRight) / 2,
+      y: (this.config.borderTop + this.config.borderBottom) / 2
+    };
+  }
+
+  getArenaRadius(entityRadius) {
+    var borderWidth = this.config.borderRight - this.config.borderLeft;
+    var borderHeight = this.config.borderBottom - this.config.borderTop;
+    var radius = Math.min(borderWidth, borderHeight) / 2;
+    return Math.max(0, radius - Math.max(0, entityRadius || 0));
+  }
+
+  getEntityRadiusFromMass(mass) {
+    return Math.ceil(Math.sqrt(Math.max(0, mass || 0) * 100));
+  }
+
+  getRandomPosition(entityRadius) {
+    var radius = Math.max(0, Number(entityRadius) || 0);
+    if (!this.isCircularArena()) {
+      return this.getWorld().getRandomPosition();
+    }
+    var center = this.getArenaCenter();
+    return utilities.getRandomPositionInCircle(center.x, center.y, this.getArenaRadius(radius));
+  }
+
+  clampPointToArena(x, y, entityRadius) {
+    var clampedX = x;
+    var clampedY = y;
+    var radius = Math.max(0, entityRadius || 0);
+    if (!this.isCircularArena()) {
+      clampedX = Math.min(Math.max(clampedX, this.config.borderLeft + radius), this.config.borderRight - radius);
+      clampedY = Math.min(Math.max(clampedY, this.config.borderTop + radius), this.config.borderBottom - radius);
+      return {
+        x: clampedX,
+        y: clampedY,
+        clamped: clampedX !== x || clampedY !== y,
+        nx: 0,
+        ny: 0
+      };
+    }
+    var center = this.getArenaCenter();
+    var dx = clampedX - center.x;
+    var dy = clampedY - center.y;
+    var distance = Math.sqrt(dx * dx + dy * dy);
+    var allowedDistance = this.getArenaRadius(radius);
+    if (distance <= allowedDistance || distance === 0) {
+      return {
+        x: clampedX,
+        y: clampedY,
+        clamped: false,
+        nx: distance === 0 ? 0 : dx / distance,
+        ny: distance === 0 ? 0 : dy / distance
+      };
+    }
+    return {
+      x: center.x + dx / distance * allowedDistance,
+      y: center.y + dy / distance * allowedDistance,
+      clamped: true,
+      nx: dx / distance,
+      ny: dy / distance
+    };
+  }
+
+  bouncePointInsideArena(x, y, entityRadius, velocityX, velocityY) {
+    var result = this.clampPointToArena(x, y, entityRadius);
+    if (!result.clamped || !this.isCircularArena()) {
+      result.vx = velocityX;
+      result.vy = velocityY;
+      return result;
+    }
+    var dot = velocityX * result.nx + velocityY * result.ny;
+    result.vx = velocityX - 2 * dot * result.nx;
+    result.vy = velocityY - 2 * dot * result.ny;
+    return result;
   }
 
   getRandomColor() {
@@ -889,10 +966,8 @@ module.exports = class GameServer {
 
         // Recombining
         if (cell.owner.cells.length > 1 && !cell.owner.norecombine) {
-          cell.recombineTicks += 0.05;
           cell.calcMergeTime(this.config.playerRecombineTime);
-        } else if (cell.owner.cells.length == 1 && cell.recombineTicks > 0) {
-          cell.recombineTicks = 0;
+        } else if (cell.owner.cells.length == 1) {
           cell.shouldRecombine = false;
           cell.owner.recombineinstant = false;
         }
@@ -1049,9 +1124,10 @@ module.exports = class GameServer {
         }
       }
 
-      pos = (pos == null) ? this.getRandomSpawn() : pos;
       mass = (mass == null) ? this.config.playerStartMass : mass;
       mass = (player.spawnmass > mass) ? player.spawnmass : mass;
+      pos = (pos == null) ? this.getRandomPosition(this.getEntityRadiusFromMass(mass)) : this.clampPointToArena(pos.x, pos.y, this.getEntityRadiusFromMass(mass));
+      pos = { x: pos.x, y: pos.y };
 
       // Checks if it's safe for players to spawn
       if (this.config.playerSafeSpawn === 1 && !pos) {
@@ -1060,7 +1136,7 @@ module.exports = class GameServer {
           for (var i = 0; i < pnode.length; i++) {
             var issafe = true;
             var check = pnode[i];
-            var pos = this.getRandomPosition();
+            var pos = this.getRandomPosition(this.getEntityRadiusFromMass(this.config.playerStartMass));
             var playerSquareSize = (this.config.playerStartMass * 100) >> 0;
             var squareR = check.mass * 100; // Checks player cell's radius
             var dx = check.position.x - pos.x;
@@ -1467,6 +1543,11 @@ module.exports = class GameServer {
       x: cell.position.x + ((sourceSize + ejectSize) * dx),
       y: cell.position.y + ((sourceSize + ejectSize) * dy)
     };
+    let clampedStart = this.clampPointToArena(startPos.x, startPos.y, Math.max(40, ejectSize));
+    startPos = {
+      x: clampedStart.x,
+      y: clampedStart.y
+    };
 
     let angle = Math.atan2(dx, dy);
     if (isNaN(angle)) {
@@ -1676,6 +1757,7 @@ module.exports = class GameServer {
       // Update the client's maps
       this.updateClients();
       this.cellUpdateTick()
+      this.gameTicks++;
 
       // Update cells/leaderboard loop
       this.tickMain++;
@@ -1802,7 +1884,11 @@ module.exports = class GameServer {
 
         // Update leaderboard with the gamemode's method
         this.leaderboard = [];
+        this.fullLeaderboard = [];
         this.gameMode.updateLB(this);
+        if (this.fullLeaderboard.length === 0) {
+          this.fullLeaderboard = this.leaderboard.slice();
+        }
         this.lb_packet = new Packet.UpdateLeaderboard(this.leaderboard, this.gameMode.packetLB, this.customLBEnd);
 
         this.tickMain = 0; // Reset

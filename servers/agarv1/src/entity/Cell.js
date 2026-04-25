@@ -21,6 +21,7 @@ function Cell(nodeId, owner, position, mass, gameServer) {
 
   this.killedBy; // Cell that ate this cell
   this.gameServer = gameServer;
+  this.createdAt = gameServer ? gameServer.gameTicks || 0 : 0;
 
   this.moveEngineTicks = 0; // Amount of times to loop the movement function
   this.moveEngineSpeed = 0;
@@ -34,6 +35,12 @@ module.exports = Cell;
 
 Cell.prototype.getId = function () {
   return this.nodeId;
+};
+Cell.prototype.getAge = function () {
+  if (!this.gameServer) {
+    return 0;
+  }
+  return this.gameServer.gameTicks - this.createdAt;
 };
 Cell.prototype.getVis = function () {
   if (this.owner) {
@@ -308,27 +315,36 @@ Cell.prototype.calcMovePhys = function (config) {
     var y1 = this.position.y + (speed * cos);
   }
 
-  // Border check - Bouncy physics
-  var radius = 40;
-  if ((x1 - radius) < config.borderLeft) {
-    // Flip angle horizontally - Left side
-    this.angle = 6.28 - this.angle;
-    x1 = config.borderLeft + radius;
-  }
-  if ((x1 + radius) > config.borderRight) {
-    // Flip angle horizontally - Right side
-    this.angle = 6.28 - this.angle;
-    x1 = config.borderRight - radius;
-  }
-  if ((y1 - radius) < config.borderTop) {
-    // Flip angle vertically - Top side
-    this.angle = (this.angle <= 3.14) ? 3.14 - this.angle : 9.42 - this.angle;
-    y1 = config.borderTop + radius;
-  }
-  if ((y1 + radius) > config.borderBottom) {
-    // Flip angle vertically - Bottom side
-    this.angle = (this.angle <= 3.14) ? 3.14 - this.angle : 9.42 - this.angle;
-    y1 = config.borderBottom - radius;
+  // Border check - keep moving cells inside the active arena shape.
+  var radius = Math.max(40, r);
+  if (this.gameServer && this.gameServer.isCircularArena && this.gameServer.isCircularArena()) {
+    var bounce = this.gameServer.bouncePointInsideArena(x1, y1, radius, sin, cos);
+    x1 = bounce.x;
+    y1 = bounce.y;
+    if (bounce.clamped) {
+      this.angle = Math.atan2(bounce.vx, bounce.vy);
+    }
+  } else {
+    if ((x1 - radius) < config.borderLeft) {
+      // Flip angle horizontally - Left side
+      this.angle = 6.28 - this.angle;
+      x1 = config.borderLeft + radius;
+    }
+    if ((x1 + radius) > config.borderRight) {
+      // Flip angle horizontally - Right side
+      this.angle = 6.28 - this.angle;
+      x1 = config.borderRight - radius;
+    }
+    if ((y1 - radius) < config.borderTop) {
+      // Flip angle vertically - Top side
+      this.angle = (this.angle <= 3.14) ? 3.14 - this.angle : 9.42 - this.angle;
+      y1 = config.borderTop + radius;
+    }
+    if ((y1 + radius) > config.borderBottom) {
+      // Flip angle vertically - Bottom side
+      this.angle = (this.angle <= 3.14) ? 3.14 - this.angle : 9.42 - this.angle;
+      y1 = config.borderBottom - radius;
+    }
   }
 
   // Set position

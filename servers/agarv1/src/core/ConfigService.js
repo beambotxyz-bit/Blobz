@@ -145,6 +145,7 @@ module.exports = class ConfigService {
       borderRight: 6000, // Right border of map (Vanilla value: 11180.3398875)
       borderTop: 0, // Top border of map (Vanilla value: 0)
       borderBottom: 6000, // Bottom border of map (Vanilla value: 11180.3398875)
+      circularArena: 1, // 1 = Use a circular playable arena inside the configured map bounds
       liveConsole: 0, // Easiest way to get stats (1 to enable)
       anounceHighScore: 0, // Announces highscore (1 to enable)
       foodSpawnAmount: 200, // The amount of food to spawn per minute
@@ -191,6 +192,7 @@ module.exports = class ConfigService {
       playerMinMassSplit: 36, // Mass required to split
       playerMaxCells: 16, // Max cells the player is allowed to have
       playerRecombineTime: 30, // Base amount of seconds before a cell is allowed to recombine
+      playerRecombineSizeMult: 0.10, // Additional remerge delay based on player cell radius
       playerMassDecayRate: .002, // Amount of mass lost per second
       playerMinMassDecay: 9, // Minimum mass for decay to occur
       playerMaxNickLength: 15, // Maximum nick length

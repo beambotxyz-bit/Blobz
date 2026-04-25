@@ -33,6 +33,15 @@ module.exports = {
       y: Math.floor(Math.random() * (borderBottom - borderTop)) + borderTop
     }
   },
+  getRandomPositionInCircle: function(centerX, centerY, radius) {
+    var safeRadius = Math.max(0, radius || 0);
+    var angle = Math.random() * Math.PI * 2;
+    var distance = Math.sqrt(Math.random()) * safeRadius;
+    return {
+      x: centerX + Math.cos(angle) * distance,
+      y: centerY + Math.sin(angle) * distance
+    };
+  },
   getDist: function (x1, y1, x2, y2) { // Use Pythagoras theorem
     let from = {'x': x1, 'y': y1 };
     let to = {'x': x2, 'y': y2};

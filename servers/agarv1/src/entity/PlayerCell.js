@@ -44,32 +44,21 @@ PlayerCell.prototype.simpleCollide = function(x1, y1, check, d) {
 };
 
 PlayerCell.prototype.calcMergeTime = function(base) {
-  // The recombine mechanic has been completely revamped.
-  // As time passes on, recombineTicks gets larger, instead of getting smaller.
-  // When the owner has only 1 cell, ticks and shouldRecombine will be reset by gameserver.
-  var r = false;
+  var sizeMult = this.owner.gameServer.config.playerRecombineSizeMult || 0.1;
+  var minTicks = Math.round(Math.max(base, this.getSize() * sizeMult) * this.owner.gameServer.config.fps);
   if (this.owner.recombineinstant) {
-    r = true; // If base recombine time is 0, instantly recombine
-  } else {
-    if (base == 0) var rec = 0.5;
-    else var rec = Math.floor(base + ((0.02 * this.mass))); // base seconds + 0.02% of mass
-    if (this.recombineTicks > rec) r = true; // Can combine with other cells
+    this.shouldRecombine = this.moveEngineTicks <= 0;
+    return;
   }
-  this.shouldRecombine = r;
+  if (base == 0) {
+    this.shouldRecombine = this.getAge() >= Math.round(this.owner.gameServer.config.fps * 0.5);
+    return;
+  }
+  this.shouldRecombine = this.getAge() >= minTicks;
 };
 
 PlayerCell.prototype.calcMergeTimeU = function(base) {
-  // The recombine mechanic has been completely revamped.
-  // As time passes on, recombineTicks gets larger, instead of getting smaller.
-  // When the owner has only 1 cell, ticks and shouldRecombine will be reset by gameserver.
-  var r = false;
-  if (base == 0 || this.owner.recombineinstant) {
-    r = true; // If base recombine time is 0, instantly recombine
-  } else {
-    var rec = Math.floor(base); // base seconds + 0.02% of mass
-    if (this.recombineTicks > rec) r = true; // Can combine with other cells
-  }
-  this.shouldRecombine = r;
+  this.calcMergeTime(base);
 };
 
 // Movement
@@ -164,19 +153,10 @@ PlayerCell.prototype.calcMove = function(x2, y2, gameServer) {
   x1 += xd + (this.position.x - xSave);
   y1 += yd + (this.position.y - ySave);
   gameServer.gameMode.onCellMove(x1, y1, this);
-  // Check to ensure we're not passing the world border (shouldn't get closer than a quarter of the cell's diameter)
-  if (x1 < config.borderLeft + r / 2) {
-    x1 = config.borderLeft + r / 2;
-  }
-  if (x1 > config.borderRight - r / 2) {
-    x1 = config.borderRight - r / 2;
-  }
-  if (y1 < config.borderTop + r / 2) {
-    y1 = config.borderTop + r / 2;
-  }
-  if (y1 > config.borderBottom - r / 2) {
-    y1 = config.borderBottom - r / 2;
-  }
+  // Keep the player inside the active arena shape.
+  var clampedPosition = gameServer.clampPointToArena(x1, y1, r);
+  x1 = clampedPosition.x;
+  y1 = clampedPosition.y;
   this.position.x = x1 >> 0;
   this.position.y = y1 >> 0;
   if (this.gameServer) this.quadUpdate(this.gameServer);

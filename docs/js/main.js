@@ -16,6 +16,8 @@
 	var lastSplitTime = 0;
 	var minFeedDelay = 50;
 	var minSplitDelay = 50;
+	var lastFeedSoundTime = 0;
+	var minFeedSoundDelay = 70;
 	var lastMaxSplitTime = 0;
 	var minMaxSplitDelay = 120;
 	var feedHoldInterval = null;
@@ -71,6 +73,7 @@
 	var eatSound = new Sound("sound/eat.mp3", defaultAudioSettings.soundsVolume, 10);
 	var backgroundMusic = null;
 	var audioUnlocked = false;
+	var feedSoundVolumeFactor = .22;
 
 	function parseToggle(value, fallback) {
 		if (typeof value === "boolean") return value;
@@ -204,6 +207,14 @@
 		(isPelletLike ? pelletSound : eatSound).play(soundsVolume);
 	}
 
+	function playFeedSound() {
+		var currentTime = Date.now();
+		if (!audioUnlocked || !playSounds) return;
+		if (currentTime - lastFeedSoundTime < minFeedSoundDelay) return;
+		lastFeedSoundTime = currentTime;
+		eatSound.play(Math.max(.05, soundsVolume * feedSoundVolumeFactor));
+	}
+
 	function resetPointerState() {
 		var centerX = canvasWidth ? canvasWidth / 2 : wHandle.innerWidth / 2;
 		var centerY = canvasHeight ? canvasHeight / 2 : wHandle.innerHeight / 2;
@@ -231,6 +242,7 @@
 		sendMouseMove();
 		sendUint8(21);
 		lastFeedTime = currentTime;
+		playFeedSound();
 		return true;
 	}
 
@@ -328,6 +340,36 @@
 			isTyping = true;
 		};
 
+		cacheLeaderboardHudElements();
+		if (leaderboardToggleButton) {
+			leaderboardToggleButton.onclick = function(event) {
+				event.preventDefault();
+				event.stopPropagation();
+				setLeaderboardOpen(!leaderboardOpen);
+				return false;
+			};
+		}
+		if (leaderboardCloseButton) {
+			leaderboardCloseButton.onclick = function(event) {
+				event.preventDefault();
+				event.stopPropagation();
+				closeLeaderboard();
+				return false;
+			};
+		}
+		if (leaderboardExitButton) {
+			leaderboardExitButton.onclick = function(event) {
+				event.preventDefault();
+				event.stopPropagation();
+				closeLeaderboard();
+				showOverlays(true);
+				wHandle.isSpectating = false;
+				return false;
+			};
+		}
+		renderLeaderboardHud();
+		updateLeaderboardHudVisibility();
+
 		var spacePressed = false, cPressed = false, qPressed = false, ePressed = false, rPressed = false, tPressed = false, wPressed = false;
 
 		wHandle.onkeydown = function (event) {
@@ -385,6 +427,10 @@
 					}
 					break;
 				case 27: // quit
+					if (leaderboardOpen) {
+						closeLeaderboard();
+						break;
+					}
 					showOverlays(true);
 					wHandle.isSpectating = false;
 					break;
@@ -639,6 +685,7 @@
 		wjQuery("#overlays").hide();
 		Ha();
 		syncMusicPlayback();
+		updateLeaderboardHudVisibility();
 	}
 
 	function setRegion(a) {
@@ -658,9 +705,11 @@
 		resetPointerState();
 		hasOverlay = true;
 		userNickName = null;
+		closeLeaderboard();
 		wjQuery("#overlays").fadeIn(arg ? 200 : 3E3);
 		arg || wjQuery("#adsBottom").fadeIn(3E3);
 		syncMusicPlayback();
+		updateLeaderboardHudVisibility();
 	}
 
 	function Ha() {
@@ -704,8 +753,11 @@
 		nodelist = [];
 		Cells = [];
 		leaderBoard = [];
+		leaderBoardSelf = null;
 		mainCanvas = teamScores = null;
 		userScore = 0;
+		closeLeaderboard();
+		renderLeaderboardHud();
 		resetPointerState();
 		//console.log('Connecting to ' + wsUrl + '...');
 		ws = new WebSocket(wsUrl);
@@ -826,13 +878,37 @@
 				var LBplayerNum = msg.getUint32(offset, true);
 				offset += 4;
 				leaderBoard = [];
+				leaderBoardSelf = null;
 				for (i = 0; i < LBplayerNum; ++i) {
 					var nodeId = msg.getUint32(offset, true);
 					offset += 4;
+					var entryRank = msg.getUint16(offset, true);
+					offset += 2;
+					var entryScore = msg.getUint32(offset, true);
+					offset += 4;
+					var entryName = getString();
 					leaderBoard.push({
 						id: nodeId,
-						name: getString()
+						rank: entryRank,
+						score: entryScore,
+						name: entryName
 					})
+				}
+				if (offset < msg.byteLength) {
+					var hasSelfEntry = msg.getUint8(offset, true);
+					offset += 1;
+					if (hasSelfEntry && offset + 6 <= msg.byteLength) {
+						var selfRank = msg.getUint16(offset, true);
+						offset += 2;
+						var selfScore = msg.getUint32(offset, true);
+						offset += 4;
+						var selfName = getString();
+						leaderBoardSelf = {
+							rank: selfRank,
+							score: selfScore,
+							name: selfName
+						};
+					}
 				}
 				drawLeaderBoard();
 				break;
@@ -1007,13 +1083,10 @@
 		 rMacro: 0,
 
 		 // Current client configs
-		 darkBG: 1,
 		 chat: 2,
 		 skins: 2,
 		 grid: 2,
-		 acid: 1,
 		 colors: 2,
-		 names: 2,
 		 showMass: 1,
 		 smooth: 1,
 
@@ -1049,21 +1122,17 @@
 		if (Data.chat) {
 			if (clientData.chat < 2) wjQuery("#chat_textbox").hide(); else wjQuery("#chat_textbox").show();
 		}
-		if (Data.darkBG) showDarkTheme = (clientData.darkBG < 2) ? false : true;
 		if (Data.skins) showSkin = (clientData.skins >= 2) ? true : false;
 		if (Data.grid) hideGrid = (clientData.grid >= 2) ? false : true;
-		if (Data.acid) xa = (clientData.acid < 2) ? false : true;
 		if (Data.colors) showColor = (clientData.colors >= 2) ? false : true;
-		if (Data.names) showName = (clientData.names < 2) ? false : true;
+		showDarkTheme = true;
+		showName = true;
 		if (Data.showMass) showMass = (clientData.showMass < 2) ? false : true;
 		if (Data.smooth) smoothRender = (clientData.smooth >= 2) ? 2 : .4;
 		if (clientData.chat == 0 || clientData.chat == 3) wjQuery('#cchat').attr('disabled', true); else wjQuery('#cchat').attr('disabled', false);
-		if (clientData.darkBG == 0 || clientData.darkBG == 3) wjQuery('#cdark').attr('disabled', true); else wjQuery('#cdark').attr('disabled', false);
 		if (clientData.skins == 0 || clientData.skins == 3) wjQuery('#cskin').attr('disabled', true); else wjQuery('#cskin').attr('disabled', false);
 		if (clientData.grid == 0 || clientData.grid == 3) wjQuery('#cgrid').attr('disabled', true); else wjQuery('#cgrid').attr('disabled', false);
-		if (clientData.acid == 0 || clientData.acid == 3) wjQuery('#cacid').attr('disabled', true); else wjQuery('#cacid').attr('disabled', false);
 		if (clientData.colors == 0 || clientData.colors == 3) wjQuery('#ccolor').attr('disabled', true); else wjQuery('#ccolor').attr('disabled', false);
-		if (clientData.names == 0 || clientData.names == 3) wjQuery('#cname').attr('disabled', true); else wjQuery('#cname').attr('disabled', false);
 		if (clientData.showMass == 0 || clientData.showMass == 3) wjQuery('#cmass').attr('disabled', true); else wjQuery('#cmass').attr('disabled', false);
 		if (clientData.smooth == 0 || clientData.smooth == 3) wjQuery('#csmooth').attr('disabled', true); else wjQuery('#csmooth').attr('disabled', false);
 	}
@@ -1173,18 +1242,19 @@
 		ua && 0 == playerCells.length && showOverlays(false)
 	}
 
-	function sendMouseMove() {
-		var msg;
-		if (wsIsOpen() && pointerInitialized) {
-			msg = rawMouseX - canvasWidth / 2;
-			var b = rawMouseY - canvasHeight / 2;
-			if (64 <= msg * msg + b * b && !(.01 > Math.abs(oldX - X) && .01 > Math.abs(oldY - Y))) {
-				oldX = X;
-				oldY = Y;
+	function sendMouseMove(targetX, targetY) {
+		var msg, sendX, sendY, hasTarget = "number" == typeof targetX && "number" == typeof targetY;
+		if (!wsIsOpen() || !pointerInitialized && !hasTarget) return;
+		sendX = hasTarget ? targetX : X;
+		sendY = hasTarget ? targetY : Y;
+		if (hasTarget || (msg = rawMouseX - canvasWidth / 2, 64 <= msg * msg + (rawMouseY - canvasHeight / 2) * (rawMouseY - canvasHeight / 2))) {
+			if (!(.01 > Math.abs(oldX - sendX) && .01 > Math.abs(oldY - sendY))) {
+				oldX = sendX;
+				oldY = sendY;
 				msg = prepareData(21);
 				msg.setUint8(0, 16);
-				msg.setFloat64(1, X, true);
-				msg.setFloat64(9, Y, true);
+				msg.setFloat64(1, sendX, true);
+				msg.setFloat64(9, sendY, true);
 				msg.setUint32(17, 0, true);
 				wsSend(msg);
 			}
@@ -1285,22 +1355,8 @@
 		}
 		buildQTree();
 		mouseCoordinateChange();
-		xa || ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-		if (xa) {
-			if (showDarkTheme) {
-				ctx.fillStyle = '#111111';
-				ctx.globalAlpha = .05;
-				ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-				ctx.globalAlpha = 1;
-			} else {
-				ctx.fillStyle = '#F2FBFF';
-				ctx.globalAlpha = .05;
-				ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-				ctx.globalAlpha = 1;
-			}
-		} else {
-			drawGrid();
-		}
+		ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+		drawGrid();
 		nodelist.sort(function (a, b) {
 			return a.size === b.size ? a.id - b.id : a.size - b.size
 		});
@@ -1308,6 +1364,7 @@
 		ctx.translate(canvasWidth / 2, canvasHeight / 2);
 		ctx.scale(viewZoom, viewZoom);
 		ctx.translate(-nodeX, -nodeY);
+		drawArenaBorderLines();
 		for (d = 0; d < Cells.length; d++) Cells[d].drawOneCell(ctx);
 
 		for (d = 0; d < nodelist.length; d++) nodelist[d].drawOneCell(ctx);
@@ -1331,28 +1388,12 @@
 			ctx.restore()
 		}
 
+		drawArenaBoundsMask();
+
 		ctx.restore();
 
-		lbCanvas && lbCanvas.width && ctx.drawImage(lbCanvas, canvasWidth - lbCanvas.width - 10, 10); // draw Leader Board
 		if (!hideChat) {
 			if ((chatCanvas != null) && (chatCanvas.width > 0)) ctx.drawImage(chatCanvas, 0, canvasHeight - chatCanvas.height - 50); // draw Chat Board
-		}
-
-		drawMinimap();
-
-		userScore = Math.max(userScore, calcUserScore());
-		if (0 != userScore) {
-			if (null == scoreText) {
-				scoreText = new UText(24, '#FFFFFF');
-			}
-			scoreText.setValue('Score: ' + ~~(userScore / 100));
-			c = scoreText.render();
-			a = c.width;
-			ctx.globalAlpha = .2;
-			ctx.fillStyle = '#000000';
-			ctx.fillRect(10, 10, a + 10, 34);//canvasHeight - 10 - 24 - 10
-			ctx.globalAlpha = 1;
-			ctx.drawImage(c, 15, 15);//canvasHeight - 10 - 24 - 5
 		}
 		drawTouchButtons(ctx);
 		drawTouch(ctx);
@@ -1405,82 +1446,113 @@
 		ctx.restore();
 	}
 
+	function getArenaMetrics() {
+		var width = rightPos - leftPos;
+		var height = bottomPos - topPos;
+		return {
+			centerX: (leftPos + rightPos) / 2,
+			centerY: (topPos + bottomPos) / 2,
+			radius: Math.min(width, height) / 2,
+			width: width,
+			height: height
+		};
+	}
+
 	function drawGrid() {
+		var arena = getArenaMetrics();
+		var ringCount = showBackgroundSectors ? 11 : 9;
+		var spokeCount = showBackgroundSectors ? 12 : 10;
+		var ringStep = arena.radius / ringCount;
+		var hubRadius = ringStep * .54;
+
 		ctx.fillStyle = showDarkTheme ? "#111111" : "#F2FBFF";
 		ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-		if (showBackgroundSectors) {
+		if (!hideGrid || showBackgroundSectors) {
 			ctx.save();
-			ctx.strokeStyle = showDarkTheme ? "#666666" : "#dddddd";
-			ctx.fillStyle = showDarkTheme ? "#666666" : "#dddddd";
-			ctx.lineWidth = 100;
-
-			// Calculate sector size based on actual map dimensions
-			const sectorCount = 5;
-			const sectorWidth = (rightPos - leftPos) / sectorCount;
-			const sectorHeight = (bottomPos - topPos) / sectorCount;
-
-			// Transform to game world coordinates
 			ctx.scale(viewZoom, viewZoom);
 			ctx.translate(-nodeX + canvasWidth / (2 * viewZoom), -nodeY + canvasHeight / (2 * viewZoom));
+			ctx.beginPath();
+			ctx.arc(arena.centerX, arena.centerY, arena.radius, 0, Math.PI * 2, false);
+			ctx.clip();
 
-			// Draw sector grid
-			for (let x = 0; x <= sectorCount; x++) {
-				const xPos = leftPos + x * sectorWidth;
-				ctx.beginPath();
-				ctx.moveTo(xPos, topPos);
-				ctx.lineTo(xPos, bottomPos);
-				ctx.stroke();
-			}
-
-			for (let y = 0; y <= sectorCount; y++) {
-				const yPos = topPos + y * sectorHeight;
-				ctx.beginPath();
-				ctx.moveTo(leftPos, yPos);
-				ctx.lineTo(rightPos, yPos);
-				ctx.stroke();
-			}
-
-			// Draw sector labels
-			ctx.font = "bold " + Math.max(sectorWidth / 3, 100) + "px Ubuntu";
-			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
-
-			for (let y = 0; y < sectorCount; y++) {
-				for (let x = 0; x < sectorCount; x++) {
-					const letter = String.fromCharCode(65 + x); // A-E
-					const number = y + 1; // 1-5
-					const label = letter + number;
-					const centerX = leftPos + (x + 0.5) * sectorWidth;
-					const centerY = topPos + (y + 0.5) * sectorHeight;
-					ctx.fillText(label, centerX, centerY);
+			if (!hideGrid) {
+				ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.18)" : "rgba(11, 41, 76, 0.12)";
+				ctx.lineWidth = 2;
+				for (var ring = 1; ring <= ringCount; ring++) {
+					ctx.beginPath();
+					ctx.arc(arena.centerX, arena.centerY, ringStep * ring, 0, Math.PI * 2, false);
+					ctx.stroke();
 				}
+
+				ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.12)" : "rgba(11, 41, 76, 0.08)";
+				for (var spoke = 0; spoke < spokeCount; spoke++) {
+					var angle = Math.PI * 2 * spoke / spokeCount;
+					var innerX = Math.cos(angle) * hubRadius;
+					var innerY = Math.sin(angle) * hubRadius;
+					var outerX = Math.cos(angle) * arena.radius;
+					var outerY = Math.sin(angle) * arena.radius;
+					ctx.beginPath();
+					ctx.moveTo(arena.centerX + innerX, arena.centerY + innerY);
+					ctx.lineTo(arena.centerX + outerX, arena.centerY + outerY);
+					ctx.stroke();
+				}
+
+				ctx.fillStyle = showDarkTheme ? "rgba(20, 34, 52, 0.34)" : "rgba(231, 244, 252, 0.68)";
+				ctx.beginPath();
+				ctx.arc(arena.centerX, arena.centerY, hubRadius, 0, Math.PI * 2, false);
+				ctx.fill();
+
+				ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.20)" : "rgba(11, 41, 76, 0.14)";
+				ctx.lineWidth = 3;
+				ctx.beginPath();
+				ctx.arc(arena.centerX, arena.centerY, hubRadius, 0, Math.PI * 2, false);
+				ctx.stroke();
+
 			}
 
+			if (showBackgroundSectors) {
+				ctx.strokeStyle = showDarkTheme ? "rgba(255, 255, 255, 0.14)" : "rgba(11, 41, 76, 0.12)";
+				ctx.lineWidth = 4;
+				ctx.beginPath();
+				ctx.arc(arena.centerX, arena.centerY, arena.radius - ringStep * .5, 0, Math.PI * 2, false);
+				ctx.stroke();
+			}
 			ctx.restore();
 		}
+	}
 
-		if (!hideGrid) {
-			ctx.save();
-			ctx.strokeStyle = showDarkTheme ? "#AAAAAA" : "#000000";
-			ctx.globalAlpha = .2;
-			ctx.scale(viewZoom, viewZoom);
-			var a = canvasWidth / viewZoom,
-				b = canvasHeight / viewZoom;
-			for (var c = -.5 + (-nodeX + a / 2) % 50; c < a; c += 50) {
-				ctx.beginPath();
-				ctx.moveTo(c, 0);
-				ctx.lineTo(c, b);
-				ctx.stroke();
-			}
-			for (c = -.5 + (-nodeY + b / 2) % 50; c < b; c += 50) {
-				ctx.beginPath();
-				ctx.moveTo(0, c);
-				ctx.lineTo(a, c);
-				ctx.stroke();
-			}
-			ctx.restore();
-		}
+	function drawArenaBorderLines() {
+		var arena = getArenaMetrics();
+
+		ctx.save();
+		ctx.beginPath();
+		ctx.arc(arena.centerX, arena.centerY, arena.radius, 0, Math.PI * 2, false);
+		ctx.lineWidth = 12 / viewZoom;
+		ctx.strokeStyle = showDarkTheme ? "rgba(186, 226, 255, 0.34)" : "rgba(11, 41, 76, 0.26)";
+		ctx.stroke();
+
+		ctx.beginPath();
+		ctx.arc(arena.centerX, arena.centerY, Math.max(0, arena.radius - 55), 0, Math.PI * 2, false);
+		ctx.lineWidth = 4 / viewZoom;
+		ctx.strokeStyle = showDarkTheme ? "rgba(255, 255, 255, 0.08)" : "rgba(11, 41, 76, 0.08)";
+		ctx.stroke();
+		ctx.restore();
+	}
+
+	function drawArenaBoundsMask() {
+		var arena = getArenaMetrics();
+		var viewWidth = canvasWidth / viewZoom;
+		var viewHeight = canvasHeight / viewZoom;
+
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(nodeX - viewWidth / 2 - 400, nodeY - viewHeight / 2 - 400, viewWidth + 800, viewHeight + 800);
+		ctx.moveTo(arena.centerX + arena.radius, arena.centerY);
+		ctx.arc(arena.centerX, arena.centerY, arena.radius, 0, Math.PI * 2, false);
+		ctx.fillStyle = showDarkTheme ? "rgba(0, 0, 0, 0.52)" : "rgba(8, 16, 30, 0.14)";
+		ctx.fill("evenodd");
+		ctx.restore();
 	}
 
 	function drawTouchButtons(ctx) {
@@ -1520,67 +1592,109 @@
 		}
 	}
 
-	function calcUserScore() {
-		for (var score = 0, i = 0; i < playerCells.length; i++) score += playerCells[i].nSize * playerCells[i].nSize;
-		return score
+	function trimLeaderboardName(name, maxLength) {
+		var label = (name || "").trim();
+		if (!label) label = "Unnamed";
+		if (label.length <= maxLength) return label;
+		return label.slice(0, Math.max(1, maxLength - 3)) + "...";
+	}
+
+	function formatLeaderboardMass(score) {
+		var value = Math.max(0, Math.floor(score || 0));
+		if (value >= 1000000) return (value / 1000000).toFixed(value >= 10000000 ? 0 : 1).replace(/\.0$/, "") + "m";
+		if (value >= 1000) return (value / 1000).toFixed(value >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k";
+		return String(value);
+	}
+
+	function cacheLeaderboardHudElements() {
+		if (leaderboardHud) return;
+		leaderboardHud = document.getElementById("lb-hud");
+		leaderboardToggleButton = document.getElementById("lb-toggle");
+		leaderboardPanel = document.getElementById("lb-panel");
+		leaderboardList = document.getElementById("lb-list");
+		leaderboardSelfWrap = document.getElementById("lb-self");
+		leaderboardEmpty = document.getElementById("lb-empty");
+		leaderboardCloseButton = document.getElementById("lb-close");
+		leaderboardExitButton = document.getElementById("lb-exit-btn");
+	}
+
+	function canDisplayLeaderboardHud() {
+		return !hasOverlay && !noRanking && null == teamScores;
+	}
+
+	function updateLeaderboardHudVisibility() {
+		cacheLeaderboardHudElements();
+		if (!leaderboardHud) return;
+		var canDisplay = canDisplayLeaderboardHud();
+		if (!canDisplay) leaderboardOpen = false;
+		leaderboardHud.classList.toggle("is-hidden", !canDisplay);
+		leaderboardHud.classList.toggle("is-open", canDisplay && leaderboardOpen);
+		if (leaderboardPanel) leaderboardPanel.classList.toggle("is-open", canDisplay && leaderboardOpen);
+		if (leaderboardToggleButton) {
+			leaderboardToggleButton.classList.toggle("is-active", canDisplay && leaderboardOpen);
+			leaderboardToggleButton.setAttribute("aria-expanded", canDisplay && leaderboardOpen ? "true" : "false");
+		}
+	}
+
+	function setLeaderboardOpen(open) {
+		leaderboardOpen = !!open;
+		updateLeaderboardHudVisibility();
+	}
+
+	function closeLeaderboard() {
+		setLeaderboardOpen(false);
+	}
+
+	function createLeaderboardRow(entry, isSelfRow) {
+		var row = document.createElement("div");
+		var rank = document.createElement("span");
+		var name = document.createElement("span");
+		var mass = document.createElement("span");
+		row.className = "lb-row" + (isSelfRow ? " is-self" : "");
+		rank.className = "lb-rank" + ((entry.rank || 0) <= 3 ? " is-podium" : "");
+		rank.textContent = String(entry.rank || "");
+		name.className = "lb-name";
+		name.textContent = trimLeaderboardName(entry.name, isSelfRow ? 14 : 12);
+		mass.className = "lb-mass";
+		mass.textContent = formatLeaderboardMass(entry.score);
+		row.appendChild(rank);
+		row.appendChild(name);
+		row.appendChild(mass);
+		return row;
+	}
+
+	function renderLeaderboardHud() {
+		cacheLeaderboardHudElements();
+		if (!leaderboardList || !leaderboardSelfWrap || !leaderboardEmpty) return;
+
+		var topEntries = leaderBoard.slice(0, 5);
+		var selfEntry = leaderBoardSelf && leaderBoardSelf.rank > 5 ? leaderBoardSelf : null;
+		var hasRows = topEntries.length > 0 || !!selfEntry;
+		var listFragment = document.createDocumentFragment();
+		var selfFragment = document.createDocumentFragment();
+
+		leaderboardList.textContent = "";
+		leaderboardSelfWrap.textContent = "";
+
+		for (var i = 0; i < topEntries.length; i++) {
+			var row = topEntries[i];
+			var isSelfInTop = leaderBoardSelf && row.rank === leaderBoardSelf.rank && row.name === leaderBoardSelf.name;
+			listFragment.appendChild(createLeaderboardRow(row, !!isSelfInTop));
+		}
+
+		if (selfEntry) {
+			selfFragment.appendChild(createLeaderboardRow(selfEntry, true));
+		}
+
+		leaderboardList.appendChild(listFragment);
+		leaderboardSelfWrap.appendChild(selfFragment);
+		leaderboardSelfWrap.style.display = selfEntry ? "block" : "none";
+		leaderboardEmpty.style.display = hasRows ? "none" : "block";
+		updateLeaderboardHudVisibility();
 	}
 
 	function drawLeaderBoard() {
-		lbCanvas = null;
-		if (null != teamScores || 0 != leaderBoard.length)
-			if (null != teamScores || showName) {
-				lbCanvas = document.createElement("canvas");
-				var ctx = lbCanvas.getContext("2d"),
-					boardLength = 60;
-				boardLength = null == teamScores ? boardLength + 24 * leaderBoard.length : boardLength + 180;
-				var scaleFactor = Math.min(0.22 * canvasHeight, Math.min(200, .3 * canvasWidth)) / 200;
-				lbCanvas.width = 200 * scaleFactor;
-				lbCanvas.height = boardLength * scaleFactor;
-
-				ctx.scale(scaleFactor, scaleFactor);
-				ctx.globalAlpha = .4;
-				ctx.fillStyle = "#000000";
-				ctx.fillRect(0, 0, 200, boardLength);
-
-				ctx.globalAlpha = 1;
-				ctx.fillStyle = "#FFFFFF";
-				var c = "Leaderboard";
-				ctx.font = "30px Ubuntu";
-				ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 40);
-				var b;
-				if (null == teamScores) {
-					for (ctx.font = "20px Ubuntu", b = 0; b < leaderBoard.length; ++b) {
-						c = leaderBoard[b].name || "An unnamed cell";
-						if (!showName) {
-							(c = "An unnamed cell");
-						}
-						if (-1 != nodesOnScreen.indexOf(leaderBoard[b].id)) {
-							playerCells[0].name && (c = playerCells[0].name);
-							ctx.fillStyle = "#FFAAAA";
-							if (!noRanking) {
-								c = b + 1 + ". " + c;
-							}
-							ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 70 + 24 * b);
-						} else {
-							ctx.fillStyle = "#FFFFFF";
-							if (!noRanking) {
-								c = b + 1 + ". " + c;
-							}
-							ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 70 + 24 * b);
-						}
-					}
-				} else {
-					for (b = c = 0; b < teamScores.length; ++b) {
-						var d = c + teamScores[b] * Math.PI * 2;
-						ctx.fillStyle = teamColor[b + 1];
-						ctx.beginPath();
-						ctx.moveTo(100, 140);
-						ctx.arc(100, 140, 80, c, d, false);
-						ctx.fill();
-						c = d
-					}
-				}
-			}
+		renderLeaderboardHud();
 	}
 
 	function Cell(uid, ux, uy, usize, ucolor, uname) {
@@ -1604,7 +1718,7 @@
 
 	var localProtocol = wHandle.location.protocol, localProtocolHttps = "https:" == localProtocol;
 
-	var nCanvas, ctx, mainCanvas, lbCanvas, chatCanvas, canvasWidth, canvasHeight, qTree = null,
+	var nCanvas, ctx, mainCanvas, chatCanvas, canvasWidth, canvasHeight, qTree = null,
 		ws = null,
 		delay = 500,
 		oldX = -1,
@@ -1619,6 +1733,16 @@
 		nodes = {}, nodelist = [],
 		Cells = [],
 		leaderBoard = [],
+		leaderBoardSelf = null,
+		leaderboardOpen = false,
+		leaderboardHud = null,
+		leaderboardToggleButton = null,
+		leaderboardPanel = null,
+		leaderboardList = null,
+		leaderboardSelfWrap = null,
+		leaderboardEmpty = null,
+		leaderboardCloseButton = null,
+		leaderboardExitButton = null,
 		chatBoard = [],
 		rawMouseX = 0,
 		rawMouseY = 0,
@@ -1655,13 +1779,10 @@
 			rMacro: 0,
 
 			// Current client configs
-			darkBG: 1,
 			chat: 2,
 			skins: 2,
 			grid: 2,
-			acid: 1,
 			colors: 2,
-			names: 2,
 			showMass: 1,
 			smooth: 1,
 
@@ -1678,7 +1799,7 @@
 			leavemessage: "",
 			instructions: "Control your cell using the mouse, w for eject, space for split, and c for x16 max split. Add &lt;skinname&gt; in your username for skins."
 		},
-		showDarkTheme = false,
+		showDarkTheme = true,
 		showMass = false,
 		showMinimap = true,
 		connectUrl = "",
@@ -1699,7 +1820,6 @@
 		drawLineX = 0,
 		drawLineY = 0,
 		teamColor = ["#333333", "#FF3333", "#33FF33", "#3333FF"],
-		xa = false,
 		zoom = 1,
 		fullscreenIcon = new Image,
 		fullscreenOffIcon = new Image,
@@ -1728,12 +1848,6 @@
 	wHandle.setRegion = setRegion;
 	wHandle.setSkins = function (arg) {
 		if (clientData.skins != 0 && clientData.skins != 3) showSkin = arg;
-	};
-	wHandle.setNames = function (arg) {
-		if (clientData.names != 0 && clientData.names != 3) showName = arg
-	};
-	wHandle.setDarkTheme = function (arg) {
-		if (clientData.darkBG != 0 && clientData.darkBG != 3) showDarkTheme = arg
 	};
 	wHandle.setSplitMacro = function (arg) {
 		if (clientData.sMacro != 0 && clientData.sMacro != 3) sMacro = !!arg;
@@ -1798,9 +1912,6 @@
 			gameMode = arg;
 			showConnecting();
 		}
-	};
-	wHandle.setAcid = function (arg) {
-		if (clientData.acid != 0 && clientData.acid != 3) xa = arg
 	};
 	wHandle.setMinimap = function (arg) {
 		showMinimap = arg;
@@ -2284,150 +2395,113 @@
 	function drawMinimap() {
 		if (!showMinimap) return;
 
-		var minimapSize = Math.min(200, canvasWidth * 0.2);
+		var arena = getArenaMetrics();
+		var minimapSize = Math.min(210, canvasWidth * 0.22);
 		var minimapPadding = 10;
-		var minimapX = canvasWidth - minimapSize - minimapPadding;
-		var minimapY = canvasHeight - minimapSize - minimapPadding;
+		var minimapRadius = minimapSize / 2;
+		var minimapCenterX = canvasWidth - minimapRadius - minimapPadding;
+		var minimapCenterY = canvasHeight - minimapRadius - minimapPadding;
+		var miniScale = minimapRadius / Math.max(1, arena.radius);
+		var ringCount = 8;
+		var spokeCount = 10;
+		var hubRadius = minimapRadius * .18;
 
 		ctx.save();
+		ctx.beginPath();
+		ctx.arc(minimapCenterX, minimapCenterY, minimapRadius, 0, 2 * Math.PI, false);
+		ctx.fillStyle = "rgba(13, 22, 38, 0.58)";
+		ctx.fill();
+		ctx.clip();
 
-		ctx.fillStyle = "rgba(100, 100, 100, 0.5)";
-		ctx.fillRect(minimapX, minimapY, minimapSize, minimapSize);
+		ctx.fillStyle = showDarkTheme ? "rgba(10, 18, 32, 0.92)" : "rgba(231, 244, 252, 0.96)";
+		ctx.beginPath();
+		ctx.arc(minimapCenterX, minimapCenterY, minimapRadius, 0, 2 * Math.PI, false);
+		ctx.fill();
 
-		ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-		ctx.lineWidth = 2;
-		ctx.strokeRect(minimapX, minimapY, minimapSize, minimapSize);
-
-		var mapSizeX = rightPos - leftPos;
-		var mapSizeY = bottomPos - topPos;
-		var miniScale = minimapSize / Math.max(mapSizeX, mapSizeY);
-
-		ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+		ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.16)" : "rgba(11, 41, 76, 0.12)";
 		ctx.lineWidth = 1;
-		ctx.font = "bold 14px Arial";
-		ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-
-		var sectorWidth = minimapSize / 5;
-		var sectorHeight = minimapSize / 5;
-
-		var currentSectorX = Math.floor((nodeX - leftPos) / (mapSizeX / 5));
-		var currentSectorY = Math.floor((nodeY - topPos) / (mapSizeY / 5));
-		var currentSectorLetter = String.fromCharCode(65 + currentSectorX);
-		var currentSectorNumber = currentSectorY + 1;
-
-		for (var i = 0; i <= 5; i++) {
-			var x = minimapX + (i * sectorWidth);
+		for (var ring = 1; ring <= ringCount; ring++) {
 			ctx.beginPath();
-			ctx.moveTo(x, minimapY);
-			ctx.lineTo(x, minimapY + minimapSize);
+			ctx.arc(minimapCenterX, minimapCenterY, minimapRadius * ring / ringCount, 0, 2 * Math.PI, false);
 			ctx.stroke();
-
-			var y = minimapY + (i * sectorHeight);
+		}
+		for (var spoke = 0; spoke < spokeCount; spoke++) {
+			var angle = Math.PI * 2 * spoke / spokeCount;
+			var innerX = Math.cos(angle) * hubRadius;
+			var innerY = Math.sin(angle) * hubRadius;
+			var outerX = Math.cos(angle) * minimapRadius;
+			var outerY = Math.sin(angle) * minimapRadius;
 			ctx.beginPath();
-			ctx.moveTo(minimapX, y);
-			ctx.lineTo(minimapX + minimapSize, y);
+			ctx.moveTo(minimapCenterX + innerX, minimapCenterY + innerY);
+			ctx.lineTo(minimapCenterX + outerX, minimapCenterY + outerY);
 			ctx.stroke();
 		}
 
-		for (var row = 0; row < 5; row++) {
-			for (var col = 0; col < 5; col++) {
-				var sectorLetter = String.fromCharCode(65 + col);
-				var sectorNumber = row + 1;
-				var centerX = minimapX + (col * sectorWidth) + sectorWidth/2;
-				var centerY = minimapY + (row * sectorHeight) + sectorHeight/2;
-				ctx.fillText(sectorLetter + sectorNumber, centerX, centerY);
-			}
-		}
+		ctx.fillStyle = showDarkTheme ? "rgba(20, 34, 52, 0.34)" : "rgba(231, 244, 252, 0.78)";
+		ctx.beginPath();
+		ctx.arc(minimapCenterX, minimapCenterY, hubRadius, 0, 2 * Math.PI, false);
+		ctx.fill();
 
-		ctx.textAlign = "left";
-		ctx.textBaseline = "alphabetic";
-
-		var sectorX = minimapX + (currentSectorX * sectorWidth);
-		var sectorY = minimapY + (currentSectorY * sectorHeight);
-		ctx.fillStyle = "rgba(255, 255, 102, 0.2)"; // Semi-transparent yellow color
-		ctx.fillRect(sectorX, sectorY, sectorWidth, sectorHeight);
-
-		ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-		ctx.lineWidth = 1;
-		var gridSize = mapSizeX / 5; // Make grid size match sector size
-
-		var startX = Math.floor(leftPos / gridSize) * gridSize;
-		var startY = Math.floor(topPos / gridSize) * gridSize;
-
-		for (var x = startX; x <= rightPos; x += gridSize) {
-			var miniX = minimapX + (x - leftPos) * miniScale;
-			if (miniX >= minimapX && miniX <= minimapX + minimapSize) {
-				ctx.beginPath();
-				ctx.moveTo(miniX, minimapY);
-				ctx.lineTo(miniX, minimapY + minimapSize);
-				ctx.stroke();
-			}
-		}
-
-		for (var y = startY; y <= bottomPos; y += gridSize) {
-			var miniY = minimapY + (y - topPos) * miniScale;
-			if (miniY >= minimapY && miniY <= minimapY + minimapSize) {
-				ctx.beginPath();
-				ctx.moveTo(minimapX, miniY);
-				ctx.lineTo(minimapX + minimapSize, miniY);
-				ctx.stroke();
-			}
-		}
+		ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.22)" : "rgba(11, 41, 76, 0.14)";
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.arc(minimapCenterX, minimapCenterY, hubRadius, 0, 2 * Math.PI, false);
+		ctx.stroke();
 
 		ctx.fillStyle = "#FFFFFF";
 		for (var i = 0; i < playerCells.length; i++) {
-			var cell = playerCells[i];
-			var miniX = minimapX + (cell.x - leftPos) * miniScale;
-			var miniY = minimapY + (cell.y - topPos) * miniScale;
-			var miniSize = Math.max(2, cell.size * miniScale);
+			var playerCell = playerCells[i];
+			var playerMiniX = minimapCenterX + (playerCell.x - arena.centerX) * miniScale;
+			var playerMiniY = minimapCenterY + (playerCell.y - arena.centerY) * miniScale;
+			var playerMiniSize = Math.max(2, playerCell.size * miniScale);
 			ctx.beginPath();
-			ctx.arc(miniX, miniY, miniSize, 0, 2 * Math.PI);
+			ctx.arc(playerMiniX, playerMiniY, playerMiniSize, 0, 2 * Math.PI, false);
 			ctx.fill();
 		}
 
-		ctx.fillStyle = "#FF0000";
-		for (var i = 0; i < nodelist.length; i++) {
-			var cell = nodelist[i];
-			if (cell.isVirus || cell.size < 50 || playerCells.indexOf(cell) !== -1) continue;
-			var miniX = minimapX + (cell.x - leftPos) * miniScale;
-			var miniY = minimapY + (cell.y - topPos) * miniScale;
-			var miniSize = Math.max(2, cell.size * miniScale);
+		ctx.fillStyle = "#FF5D5D";
+		for (var j = 0; j < nodelist.length; j++) {
+			var node = nodelist[j];
+			if (node.isVirus || node.size < 50 || playerCells.indexOf(node) !== -1) continue;
+			var enemyMiniX = minimapCenterX + (node.x - arena.centerX) * miniScale;
+			var enemyMiniY = minimapCenterY + (node.y - arena.centerY) * miniScale;
+			var enemyMiniSize = Math.max(2, node.size * miniScale);
 			ctx.beginPath();
-			ctx.arc(miniX, miniY, miniSize, 0, 2 * Math.PI);
+			ctx.arc(enemyMiniX, enemyMiniY, enemyMiniSize, 0, 2 * Math.PI, false);
 			ctx.fill();
 		}
 
-		ctx.strokeStyle = "#FFFFFF";
-		ctx.lineWidth = 1;
-		var viewX = minimapX + (nodeX - leftPos) * miniScale;
-		var viewY = minimapY + (nodeY - topPos) * miniScale;
-		var viewW = (canvasWidth / viewZoom) * miniScale;
-		var viewH = (canvasHeight / viewZoom) * miniScale;
-		ctx.strokeRect(viewX - viewW/2, viewY - viewH/2, viewW, viewH);
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		ctx.arc(minimapCenterX + (nodeX - arena.centerX) * miniScale, minimapCenterY + (nodeY - arena.centerY) * miniScale, Math.max(4, Math.min(20, minimapRadius * 0.08)), 0, 2 * Math.PI, false);
+		ctx.stroke();
+		ctx.restore();
+
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.48)";
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		ctx.arc(minimapCenterX, minimapCenterY, minimapRadius, 0, 2 * Math.PI, false);
+		ctx.stroke();
 
 		ctx.font = "bold 14px Arial";
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		var coordText = "X: " + ~~nodeX + ", Y: " + ~~nodeY + " [" + currentSectorLetter + currentSectorNumber + "]";
-
+		var coordText = "X: " + ~~nodeX + ", Y: " + ~~nodeY;
 		var textWidth = ctx.measureText(coordText).width;
 		var padding = 5;
 		var textHeight = 18;
-		var textY = minimapY - 15;
+		var textY = minimapCenterY - minimapRadius - 15;
 
-		ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+		ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
 		ctx.fillRect(
-			minimapX + minimapSize/2 - textWidth/2 - padding,
-			textY - textHeight/2 - padding,
+			minimapCenterX - textWidth / 2 - padding,
+			textY - textHeight / 2 - padding,
 			textWidth + padding * 2,
 			textHeight + padding * 2
 		);
 
 		ctx.fillStyle = "#FFFFFF";
-		ctx.fillText(coordText, minimapX + minimapSize/2, textY);
-
-		ctx.restore();
+		ctx.fillText(coordText, minimapCenterX, textY);
 	}
 })(window, window.jQuery);

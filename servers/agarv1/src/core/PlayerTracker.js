@@ -457,7 +457,20 @@ module.exports = class PlayerTracker {
 
     // Update leaderboard
     if (this.tickLeaderboard <= 0) {
-      this.socket.sendPacket(this.gameServer.lb_packet);
+      if (this.gameServer.gameMode.packetLB === 49) {
+        this.socket.sendPacket(new Packet.UpdateLeaderboard(
+          this.gameServer.leaderboard,
+          this.gameServer.gameMode.packetLB,
+          this.gameServer.customLBEnd,
+          {
+            viewer: this,
+            topLimit: 5,
+            allPlayers: this.gameServer.fullLeaderboard
+          }
+        ));
+      } else {
+        this.socket.sendPacket(this.gameServer.lb_packet);
+      }
       this.tickLeaderboard = 10; // 20 ticks = 1 second
     } else {
       this.tickLeaderboard--;
@@ -705,18 +718,9 @@ module.exports = class PlayerTracker {
 
   checkBorderPass() {
     // A check while in free-roam mode to avoid player going into nothingness
-    if (this.centerPos.x < this.gameServer.config.borderLeft) {
-      this.centerPos.x = this.gameServer.config.borderLeft;
-    }
-    if (this.centerPos.x > this.gameServer.config.borderRight) {
-      this.centerPos.x = this.gameServer.config.borderRight;
-    }
-    if (this.centerPos.y < this.gameServer.config.borderTop) {
-      this.centerPos.y = this.gameServer.config.borderTop;
-    }
-    if (this.centerPos.y > this.gameServer.config.borderBottom) {
-      this.centerPos.y = this.gameServer.config.borderBottom;
-    }
+    var clampedCenter = this.gameServer.clampPointToArena(this.centerPos.x, this.centerPos.y, 0);
+    this.centerPos.x = clampedCenter.x;
+    this.centerPos.y = clampedCenter.y;
   };
 
   sendPosPacket(specZoom) {

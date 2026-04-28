@@ -414,13 +414,15 @@ module.exports = class GameServer {
       }
 
       let origin = ws.upgradeReq.rawHeaders[ws.upgradeReq.rawHeaders.indexOf('Origin') + 1];
-      let allowedOrigins = new Set([
-        'http://localhost:58585',
-        'http://localhost:8081',
-        'http://127.0.0.1:8081'
-      ]);
+      let isAllowedOrigin = function (value) {
+        if (!value) return false;
+        return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(value) ||
+          /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/i.test(value) ||
+          /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/i.test(value) ||
+          /^https?:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/i.test(value);
+      };
 
-      if (!allowedOrigins.has(origin)) {
+      if (!isAllowedOrigin(origin)) {
         console.log('[' + (new Date().toISOString().replace('T', ' ')) + '] Origin: ' + origin + ' REFUSED');
         ws.close();
         return;
@@ -808,6 +810,37 @@ module.exports = class GameServer {
     return Math.ceil(Math.sqrt(Math.max(0, mass || 0) * 100));
   }
 
+  getMiniVirusMass() {
+    return Math.max(10, Number(this.config.virusMiniMass) || Math.round(this.config.virusStartMass * 0.67));
+  }
+
+  getRandomVirusMass(percent) {
+    var smallChance = Math.max(0, Math.min(100, Number(percent) || 0));
+    return Math.random() * 100 < smallChance ? this.getMiniVirusMass() : this.config.virusStartMass;
+  }
+
+  getRandomSpawnVirusMass() {
+    return this.getRandomVirusMass(this.config.virusMiniSpawnPercent);
+  }
+
+  getRandomShotVirusMass() {
+    return this.getRandomVirusMass(this.config.virusMiniShotPercent);
+  }
+
+  createConfiguredVirus(position, mass, options) {
+    options = options || {};
+    var tier = mass <= this.getMiniVirusMass() ? 'mini' : 'normal';
+    var configuredVirus = new Entity.Virus(this.world.getNextNodeId(), null, position, mass, this);
+    configuredVirus.setShotProfile({
+      baseVirusMass: mass,
+      isChildVirus: !!options.isChildVirus,
+      virusTier: tier,
+      maxShots: options.maxShots,
+      shotsRemaining: options.shotsRemaining
+    }, this);
+    return configuredVirus;
+  }
+
   getRandomPosition(entityRadius) {
     var radius = Math.max(0, Number(entityRadius) || 0);
     if (!this.isCircularArena()) {
@@ -1069,6 +1102,10 @@ module.exports = class GameServer {
 
       }
       let name;
+      if (!dono) {
+        player.premium = '';
+        player.rainbowon = false;
+      }
       if (this.config.randomnames == 1 && !dono) {
         if (this.randomNames.length > 0) {
           let index = Math.floor(Math.random() * this.randomNames.length);
@@ -1097,6 +1134,9 @@ module.exports = class GameServer {
 
         }
 
+      }
+      if (this.config.skins == 1 && !dono && !player.premium) {
+        player.premium = this.getDefaultPremiumSkin(player);
       }
       var isAdmin = false;
 
@@ -1220,21 +1260,27 @@ module.exports = class GameServer {
 
   }
 
+  getDefaultPremiumSkin(player) {
+    return '%Base';
+  }
+
   getPremiumFromName(player) {
     if (player.name.substr(0, 1) == "<") {
       let n = player.name.indexOf(">");
       if (n != -1) {
         var prem = '';
-        if (player.name.substr(1, n - 1) == "r" && this.config.rainbow == 1) {
+        var premiumTag = player.name.substr(1, n - 1);
+        var skinToken = premiumTag.split("|")[0];
+        if (skinToken == "r" && this.config.rainbow == 1) {
           player.rainbowon = true;
-        } else if (player.name.substr(1, n - 1) == "/random") {
+        } else if (skinToken == "/random") {
           if (this.rSkins.length > 0) {
             let index = Math.floor(Math.random() * this.rSkins.length);
             prem = this.rSkins[index];
 
           }
-        } else {
-          player.premium = '%' + player.name.substr(1, n - 1);
+        } else if (skinToken) {
+          player.premium = '%' + skinToken;
         }
         if (prem) {
           var o = false;
@@ -1260,7 +1306,7 @@ module.exports = class GameServer {
             if (!this.skinshortcut[i] || !this.skin[i]) {
               continue;
             }
-            if (player.name.substr(1, n - 1) == this.skinshortcut[i]) {
+            if (skinToken == this.skinshortcut[i]) {
               player.premium = this.skin[i];
               break;
             }
@@ -1674,9 +1720,17 @@ module.exports = class GameServer {
       y: parent.position.y
     };
 
-    let newVirus = new Entity.Virus(this.world.getNextNodeId(), null, parentPos, this.config.virusStartMass);
+    let shotMass = this.getRandomShotVirusMass();
+    let newVirus = this.createConfiguredVirus(parentPos, shotMass, {
+      isChildVirus: true,
+      maxShots: this.config.virusChildShots,
+      shotsRemaining: this.config.virusChildShots
+    });
     newVirus.setAngle(parent.getAngle());
-    newVirus.setMoveEngineData(this.config.virusShotSpeed, 40, 0.88);
+    let speedVariance = 0.9 + Math.random() * 0.16;
+    let shotSpeed = this.config.virusShotSpeed * speedVariance;
+    let shotTicks = 28 + Math.floor(Math.random() * 5);
+    newVirus.setMoveEngineData(shotSpeed, shotTicks, 0.84);
 
     // Add to moving cells list
     this.addNode(newVirus, "moving");

@@ -11,29 +11,91 @@ function Virus() {
   this.wobbly = 0; // wobbly effect
   this.isMotherCell = false; // Not to confuse bots
   this.par;
+  this.baseVirusMass = this.mass;
+  this.maxShots = null;
+  this.shotsRemaining = null;
+  this.isChildVirus = false;
+  this.virusTier = 'normal';
 }
 
 module.exports = Virus;
 
 Virus.prototype = new Cell();
 
+Virus.prototype.ensureShotProfile = function (gameServer) {
+  if (!gameServer) return;
+
+  var normalMass = Math.max(10, Number(gameServer.config.virusStartMass) || 100);
+  var miniMass = Math.max(10, Number(gameServer.config.virusMiniMass) || Math.round(normalMass * 0.67));
+
+  if (!isFinite(this.baseVirusMass) || this.baseVirusMass <= 0) {
+    this.baseVirusMass = this.mass > 0 ? this.mass : normalMass;
+  }
+  if (typeof this.isChildVirus !== 'boolean') {
+    this.isChildVirus = false;
+  }
+  if (!this.virusTier) {
+    this.virusTier = this.baseVirusMass <= miniMass ? 'mini' : 'normal';
+  }
+
+  var defaultShots = this.isChildVirus ?
+    Math.max(0, Number(gameServer.config.virusChildShots) || 1) :
+    Math.max(0, Number(gameServer.config.virusBaseShots) || 2);
+
+  if (typeof this.maxShots !== 'number' || !isFinite(this.maxShots) || this.maxShots < 0) {
+    this.maxShots = defaultShots;
+  }
+  if (typeof this.shotsRemaining !== 'number' || !isFinite(this.shotsRemaining) || this.shotsRemaining < 0) {
+    this.shotsRemaining = this.maxShots;
+  }
+
+  this.mass = this.baseVirusMass;
+};
+
+Virus.prototype.setShotProfile = function (profile, gameServer) {
+  profile = profile || {};
+
+  if (isFinite(profile.baseVirusMass) && profile.baseVirusMass > 0) {
+    this.baseVirusMass = profile.baseVirusMass;
+    this.mass = profile.baseVirusMass;
+  }
+  if (typeof profile.isChildVirus === 'boolean') {
+    this.isChildVirus = profile.isChildVirus;
+  }
+  if (typeof profile.virusTier === 'string' && profile.virusTier.length) {
+    this.virusTier = profile.virusTier;
+  }
+  if (isFinite(profile.maxShots) && profile.maxShots >= 0) {
+    this.maxShots = profile.maxShots;
+  }
+  if (isFinite(profile.shotsRemaining) && profile.shotsRemaining >= 0) {
+    this.shotsRemaining = profile.shotsRemaining;
+  }
+
+  this.ensureShotProfile(gameServer);
+  return this;
+};
+
 
 Virus.prototype.calcMove = null; // Only for player controlled movement
 
 Virus.prototype.feed = function (feeder, gameServer) {
+  this.ensureShotProfile(gameServer);
   if (this.moveEngineTicks == 0) this.setAngle(feeder.getAngle()); // Set direction if the virus explodes
-   var random = Math.floor(Math.random() * 20);
- if (random > 4 && this.mass < gameServer.config.virusStartMass + 400) this.mass += feeder.mass;
-  var random = Math.floor(Math.random() * 20);
   gameServer.removeNode(feeder);
-  
-if (random > 3) this.fed++; // Increase feed count
-  // Check if the virus is going to explode
-  if (this.fed >= gameServer.config.virusFeedAmount && gameServer.getVirusNodes().length < gameServer.config.virusMaxAmount) {
-    this.mass = gameServer.config.virusStartMass; // Reset mass
+
+  this.fed++;
+
+  if (this.fed >= gameServer.config.virusFeedAmount && this.shotsRemaining > 0 && gameServer.getVirusNodes().length < gameServer.config.virusMaxAmount) {
     this.fed = 0;
+    this.shotsRemaining--;
     gameServer.shootVirus(this);
+  } else if (this.fed >= gameServer.config.virusFeedAmount) {
+    this.fed = 0;
   }
+
+  this.mass = this.baseVirusMass;
+  return true;
 
 };
 
@@ -200,6 +262,7 @@ Virus.prototype.onConsume = function (consumer, gameServer) {
 };
 
 Virus.prototype.onAdd = function (gameServer) {
+  this.ensureShotProfile(gameServer);
   gameServer.addVirusNodes(this);
 };
 
@@ -220,7 +283,7 @@ Virus.prototype.onAutoMove = function (gameServer) {
     if (this.collisionCheck(bottomY, topY, rightX, leftX)) {
       check.angle = 0; //vanilla default is right
       this.feed(check, gameServer);
-      this.mass = gameServer.config.virusStartMass;
+      this.mass = this.baseVirusMass;
       ejectedNodes.length--;
     }
   }

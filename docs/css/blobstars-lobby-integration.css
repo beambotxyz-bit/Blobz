@@ -1,0 +1,5 @@
+﻿/* Blobz keeps this file intentionally tiny so the lobby can mirror the reference UI. */
+button { font: inherit; }
+button.play-btn { border: 2px solid rgba(255,255,255,0.2); }
+.profile-pill .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.modal-content input[type="range"] { accent-color: #00e5ff; }

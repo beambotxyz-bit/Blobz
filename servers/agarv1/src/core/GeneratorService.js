@@ -100,12 +100,13 @@ module.exports = class GeneratorService {
       let virusNodes = this.gameServer.getVirusNodes();
       if (virusNodes.length < this.config.virusMinAmount) {
         // Spawns a virus
-        let pos = this.gameServer.getRandomPosition(this.gameServer.getEntityRadiusFromMass(this.config.virusStartMass));
-        let virusSquareSize = (this.config.virusStartMass * 100) >> 0;
+        let virusMass = this.gameServer.getRandomSpawnVirusMass();
+        let pos = this.gameServer.getRandomPosition(this.gameServer.getEntityRadiusFromMass(virusMass));
+        let virusSquareSize = (virusMass * 100) >> 0;
 
         // Check for players
         let result = this.gameServer.getNodesPlayer().some((check) => {
-          if (check.mass < this.config.virusStartMass) return false;
+          if (check.mass < virusMass) return false;
 
           var squareR = check.getSquareSize(); // squared Radius of checking player cell
 
@@ -118,7 +119,11 @@ module.exports = class GeneratorService {
         if (result) return;
 
         // Spawn if no cells are colliding
-        let v = new Entity.Virus(this.gameServer.getWorld().getNextNodeId(), null, pos, this.config.virusStartMass);
+        let v = this.gameServer.createConfiguredVirus(pos, virusMass, {
+          isChildVirus: false,
+          maxShots: this.config.virusBaseShots,
+          shotsRemaining: this.config.virusBaseShots
+        });
         if (this.gameServer.gameMode.ID == 2)
           this.gameServer.addNode(v, "moving");
         else

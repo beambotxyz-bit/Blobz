@@ -113,6 +113,7 @@
 		settings.soundsVolume = soundsVolume;
 		settings.playMusic = !!playMusic;
 		settings.musicVolume = musicVolume;
+		settings.jellyPhysics = !!jellyPhysics;
 		wHandle.localStorage.settings = JSON.stringify(settings);
 	}
 
@@ -149,6 +150,7 @@
 		pelletSound.volume = soundsVolume;
 		eatSound.volume = soundsVolume;
 		if (backgroundMusic) backgroundMusic.volume = musicVolume;
+		updateVisualControls();
 	}
 
 	function updateMacroControls() {
@@ -166,12 +168,18 @@
 		return sMacro ? 220 : Math.max(220, Math.round(1000 / 7));
 	}
 
+	function updateVisualControls() {
+		var jellyToggle = document.getElementById("cjelly");
+		if (jellyToggle) jellyToggle.checked = !!jellyPhysics;
+	}
+
 	function loadAudioSettings() {
 		var storedSettings = readStoredSettings();
 		playSounds = parseToggle(storedSettings.playSounds, playSounds);
 		soundsVolume = clampVolume(storedSettings.soundsVolume, soundsVolume);
 		playMusic = parseToggle(storedSettings.playMusic, playMusic);
 		musicVolume = clampVolume(storedSettings.musicVolume, musicVolume);
+		jellyPhysics = parseToggle(storedSettings.jellyPhysics, jellyPhysics);
 		updateAudioControls();
 	}
 
@@ -722,7 +730,7 @@
 			grecaptcha.ready(() => {
 				grecaptcha.execute('6LdxZMspAAAAAOVZOMGJQ_yJo2hBI9QAbShSr_F3', { action: 'connect' }).then(token => {
 					var socketHost = window.location.hostname || '127.0.0.1';
-					var socketUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + socketHost + ':3000/ws1/';
+					var socketUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + socketHost + ':9999/ws1/';
 					wsConnect(socketUrl + '?token=' + token);
 				});
 			});
@@ -1013,13 +1021,13 @@
 		var from = len - 15;
 		if (from < 0) from = 0;
 		for (var i = 0; i < (len - from); i++) {
-			var chatName = new UText(18, chatBoard[i + from].color);
+			var chatName = new UText(14, chatBoard[i + from].color);
 			chatName.setValue(chatBoard[i + from].name);
 			var width = chatName.getWidth();
 			var a = chatName.render();
 			ctx.drawImage(a, 15, chatCanvas.height / scaleFactor - 24 * (len - i - from));
 
-			var chatText = new UText(18, '#666666');
+			var chatText = new UText(14, '#7a7a7a');
 			chatText.setValue(': ' + chatBoard[i + from].message);
 			a = chatText.render();
 			ctx.drawImage(a, 12 + width * 1.8, chatCanvas.height / scaleFactor - 24 * (len - from - i));
@@ -1181,13 +1189,11 @@
 			flags & 2 && (offset += 4);
 			flags & 4 && (offset += 8);
 			flags & 8 && (offset += 16);
-			if (isNewProto) {
-				for (var char, skin = ""; ;) {
-					char = view.getUint8(offset, true);
-					offset++;
-					if (0 == char) break;
-					skin += String.fromCharCode(char);
-				}
+			for (var char, skin = ""; ;) {
+				char = view.getUint8(offset, true);
+				offset++;
+				if (0 == char) break;
+				skin += String.fromCharCode(char);
 			}
 			for (var char, name = ""; ;) {
 				char = view.getUint16(offset, true);
@@ -1223,7 +1229,8 @@
 			node.skin = skin;
 			name && node.setName(name);
 			if (-1 != nodesOnScreen.indexOf(nodeid) && -1 == playerCells.indexOf(node)) {
-				document.getElementById("overlays").style.display = "none";
+				var overlaysEl = document.getElementById("overlays");
+				if (overlaysEl) overlaysEl.style.display = "none";
 				playerCells.push(node);
 				if (1 == playerCells.length) {
 					nodeX = node.x;
@@ -1465,7 +1472,7 @@
 		var ringStep = arena.radius / ringCount;
 		var hubRadius = ringStep * .54;
 
-		ctx.fillStyle = showDarkTheme ? "#111111" : "#F2FBFF";
+		ctx.fillStyle = "#000000";
 		ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
 		if (!hideGrid || showBackgroundSectors) {
@@ -1477,7 +1484,7 @@
 			ctx.clip();
 
 			if (!hideGrid) {
-				ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.18)" : "rgba(11, 41, 76, 0.12)";
+				ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
 				ctx.lineWidth = 2;
 				for (var ring = 1; ring <= ringCount; ring++) {
 					ctx.beginPath();
@@ -1485,7 +1492,7 @@
 					ctx.stroke();
 				}
 
-				ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.12)" : "rgba(11, 41, 76, 0.08)";
+				ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
 				for (var spoke = 0; spoke < spokeCount; spoke++) {
 					var angle = Math.PI * 2 * spoke / spokeCount;
 					var innerX = Math.cos(angle) * hubRadius;
@@ -1498,12 +1505,12 @@
 					ctx.stroke();
 				}
 
-				ctx.fillStyle = showDarkTheme ? "rgba(20, 34, 52, 0.34)" : "rgba(231, 244, 252, 0.68)";
+				ctx.fillStyle = "rgba(0, 0, 0, 0.96)";
 				ctx.beginPath();
 				ctx.arc(arena.centerX, arena.centerY, hubRadius, 0, Math.PI * 2, false);
 				ctx.fill();
 
-				ctx.strokeStyle = showDarkTheme ? "rgba(180, 219, 255, 0.20)" : "rgba(11, 41, 76, 0.14)";
+				ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
 				ctx.lineWidth = 3;
 				ctx.beginPath();
 				ctx.arc(arena.centerX, arena.centerY, hubRadius, 0, Math.PI * 2, false);
@@ -1512,7 +1519,7 @@
 			}
 
 			if (showBackgroundSectors) {
-				ctx.strokeStyle = showDarkTheme ? "rgba(255, 255, 255, 0.14)" : "rgba(11, 41, 76, 0.12)";
+				ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
 				ctx.lineWidth = 4;
 				ctx.beginPath();
 				ctx.arc(arena.centerX, arena.centerY, arena.radius - ringStep * .5, 0, Math.PI * 2, false);
@@ -1529,13 +1536,13 @@
 		ctx.beginPath();
 		ctx.arc(arena.centerX, arena.centerY, arena.radius, 0, Math.PI * 2, false);
 		ctx.lineWidth = 12 / viewZoom;
-		ctx.strokeStyle = showDarkTheme ? "rgba(186, 226, 255, 0.34)" : "rgba(11, 41, 76, 0.26)";
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.32)";
 		ctx.stroke();
 
 		ctx.beginPath();
 		ctx.arc(arena.centerX, arena.centerY, Math.max(0, arena.radius - 55), 0, Math.PI * 2, false);
 		ctx.lineWidth = 4 / viewZoom;
-		ctx.strokeStyle = showDarkTheme ? "rgba(255, 255, 255, 0.08)" : "rgba(11, 41, 76, 0.08)";
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
 		ctx.stroke();
 		ctx.restore();
 	}
@@ -1550,7 +1557,7 @@
 		ctx.rect(nodeX - viewWidth / 2 - 400, nodeY - viewHeight / 2 - 400, viewWidth + 800, viewHeight + 800);
 		ctx.moveTo(arena.centerX + arena.radius, arena.centerY);
 		ctx.arc(arena.centerX, arena.centerY, arena.radius, 0, Math.PI * 2, false);
-		ctx.fillStyle = showDarkTheme ? "rgba(0, 0, 0, 0.52)" : "rgba(8, 16, 30, 0.14)";
+		ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
 		ctx.fill("evenodd");
 		ctx.restore();
 	}
@@ -1827,6 +1834,7 @@
 		ejectIcon = new Image,
 		noRanking = false,
 		showBackgroundSectors = true,
+			jellyPhysics = true,
 		playSounds = defaultAudioSettings.playSounds,
 		soundsVolume = defaultAudioSettings.soundsVolume,
 		playMusic = defaultAudioSettings.playMusic,
@@ -1868,6 +1876,11 @@
 	};
 	wHandle.setSmooth = function (arg) {
 		if (clientData.smooth != 0 && clientData.smooth != 3) smoothRender = arg ? 2 : .4
+	};
+	wHandle.setJellyPhysics = function (arg) {
+		jellyPhysics = !!arg;
+		updateVisualControls();
+		persistAudioSettings();
 	};
 	wHandle.setPlaySounds = function(arg) {
 		playSounds = !!arg;
@@ -1920,6 +1933,30 @@
 		showBackgroundSectors = arg;
 	};
 	wHandle.connect = wsConnect;
+	wHandle.blobzGame = {
+		connect: wsConnect,
+		getSocketState: function() {
+			return ws ? ws.readyState : -1;
+		},
+		isConnected: wsIsOpen,
+		hasPlayerCells: function() {
+			return playerCells.length > 0;
+		},
+		disconnect: function() {
+			if (!ws) return;
+			ws.onopen = null;
+			ws.onmessage = null;
+			ws.onclose = null;
+			try {
+				ws.close();
+			} catch (e) {}
+			ws = null;
+		},
+		isLeaderboardOpen: function() {
+			return leaderboardOpen;
+		},
+		closeLeaderboard: closeLeaderboard
+	};
 
 	Cell.prototype = {
 		id: 0,
@@ -2010,7 +2047,10 @@
 			if (20 > this.size) a = 0;
 			if (this.isVirus) a = 30;
 			var b = this.size;
-			if (!this.isVirus) (b *= viewZoom);
+			if (!this.isVirus) {
+				var zoomFactor = Math.max(viewZoom, 0.45);
+				b *= zoomFactor;
+			}
 			b *= z;
 			if (this.flag & 32) (b *= .25);
 			return ~~Math.max(b, a);
@@ -2020,7 +2060,7 @@
 			for (var points = this.points, pointsacc = this.pointsAcc, numpoints = points.length, i = 0; i < numpoints; ++i) {
 				var pos1 = pointsacc[(i - 1 + numpoints) % numpoints],
 					pos2 = pointsacc[(i + 1) % numpoints];
-				pointsacc[i] += (Math.random() - .5) * (this.isAgitated ? 3 : 1);
+				pointsacc[i] += (Math.random() - .5) * (this.isAgitated ? 3 : 2);
 				pointsacc[i] *= .7;
 				10 < pointsacc[i] && (pointsacc[i] = 10);
 				-10 > pointsacc[i] && (pointsacc[i] = -10);
@@ -2055,7 +2095,9 @@
 				points[j].size = (e + m + 8 * f) / 10;
 				e = 2 * Math.PI / numpoints;
 				m = this.points[j].size;
-				this.isVirus && 0 == j % 2 && (m += 5);
+				if (this.isVirus && 0 == j % 2) {
+					m += this.size <= 82 ? 1.6 : 2.4;
+				}
 				points[j].x = this.x + Math.cos(e * j + isvirus) * m;
 				points[j].y = this.y + Math.sin(e * j + isvirus) * m
 			}
@@ -2085,8 +2127,25 @@
 		},
 		drawOneCell: function (ctx) {
 			if (this.shouldRender()) {
-				var b = (0 != this.id && !this.isVirus && !this.isAgitated && smoothRender > viewZoom);
-				if (5 > this.getNumPoints()) b = true;
+				var skinurl = '';
+				var skinCacheKey = '';
+				var requestedSkin = false;
+
+				if (this.skin) {
+					var fir = this.skin.charAt(0);
+
+					if (fir === '%') {
+						skinurl = SKIN_URL + this.skin.substring(1).split('|')[0] + '.png';
+					} else if (fir === ':') {
+						skinurl = this.skin.substring(1).split('|')[0];
+					}
+				}
+				if (skinurl !== '') {
+					skinCacheKey = skinurl;
+					requestedSkin = !this.isAgitated && showSkin && skinurl !== './skins/.png';
+				}
+
+				var b = !jellyPhysics;
 				if (this.wasSimpleDrawing && !b)
 					for (var c = 0; c < this.points.length; c++) this.points[c].size = this.size;
 				this.wasSimpleDrawing = b;
@@ -2096,7 +2155,7 @@
 				this.destroyed && (ctx.globalAlpha *= 1 - c);
 				ctx.lineWidth = 10;
 				ctx.lineCap = "round";
-				ctx.lineJoin = this.isVirus ? "miter" : "round";
+				ctx.lineJoin = "round";
 				if (showColor) {
 					ctx.fillStyle = "#FFFFFF";
 					ctx.strokeStyle = "#AAAAAA";
@@ -2124,44 +2183,95 @@
 				}
 				ctx.closePath();
 
-				var skinName = this.name.toLowerCase().split('|')[0];
-				var skinurl = '';
-
-				if (this.skin) {
-					var fir = this.skin.charAt(0);
-
-					if (fir === '%') {
-						skinurl = SKIN_URL + this.skin.substring(1).split('|')[0] + '.png';
-					} else if (fir === ':') {
-						skinurl = this.skin.substring(1).split('|')[0];
-					}
-				}
-
-				if (!this.isAgitated && showSkin && skinurl !== '' && skinurl !== './skins/.png') {
-					if (!skins.hasOwnProperty(skinName)) {
-						skins[skinName] = new Image;
-						skins[skinName].src = skinurl;
+				if (requestedSkin) {
+					if (!skins.hasOwnProperty(skinCacheKey)) {
+						skins[skinCacheKey] = new Image;
+						skins[skinCacheKey].src = skinurl;
 					}
 
-					if (0 !== skins[skinName].width && skins[skinName].complete) {
-						c = skins[skinName];
+					if (0 !== skins[skinCacheKey].width && skins[skinCacheKey].complete) {
+						c = skins[skinCacheKey];
 					} else {
 						c = null;
 					}
 				} else {
 					c = null;
 				}
-
 				c = (e = c) ? true : false;
-				b || ctx.stroke();
-				ctx.fill();
-				if (e) {
+				if (this.isVirus) {
+					var virusRadius = this.size;
+					if (showColor) {
+						ctx.fillStyle = "#050004";
+						ctx.strokeStyle = "#220055";
+					} else {
+						var virusFill = ctx.createRadialGradient(
+							this.x - virusRadius * 0.15,
+							this.y - virusRadius * 0.18,
+							virusRadius * 0.06,
+							this.x,
+							this.y,
+							virusRadius * 1.02
+						);
+						virusFill.addColorStop(0, "#000000");
+						virusFill.addColorStop(0.35, "#11001a");
+						virusFill.addColorStop(0.7, "#220033");
+						virusFill.addColorStop(1, "#020006");
+						ctx.fillStyle = virusFill;
+						ctx.strokeStyle = "rgba(100,0,180,0.55)";
+					}
+					ctx.lineWidth = Math.max(3, virusRadius * 0.075);
+					ctx.fill();
+					b || ctx.stroke();
 					ctx.save();
 					ctx.clip();
-					ctx.drawImage(e, this.x - this.size, this.y - this.size, 2 * this.size, 2 * this.size);
+					if (!showColor) {
+						var voidGlow = ctx.createRadialGradient(
+							this.x,
+							this.y,
+							virusRadius * 0.08,
+							this.x,
+							this.y,
+							virusRadius * 0.76
+						);
+						voidGlow.addColorStop(0, "rgba(130,0,180,0.55)");
+						voidGlow.addColorStop(.42, "rgba(65,0,120,0.28)");
+						voidGlow.addColorStop(1, "rgba(0,0,0,0)");
+						ctx.fillStyle = voidGlow;
+						ctx.beginPath();
+						ctx.arc(this.x, this.y, virusRadius * 0.82, 0, 2 * Math.PI, false);
+						ctx.fill();
+
+						ctx.lineCap = "round";
+						ctx.lineWidth = Math.max(2, virusRadius * 0.07);
+						ctx.strokeStyle = "rgba(150,50,255,0.35)";
+						ctx.beginPath();
+						ctx.ellipse(this.x - virusRadius * 0.04, this.y, virusRadius * 0.46, virusRadius * 0.28, 0.32, 0.22 * Math.PI, 1.3 * Math.PI, false);
+						ctx.stroke();
+
+						ctx.strokeStyle = "rgba(130,20,220,0.28)";
+						ctx.beginPath();
+						ctx.ellipse(this.x + virusRadius * 0.08, this.y - virusRadius * 0.02, virusRadius * 0.38, virusRadius * 0.22, -0.4, 0.9 * Math.PI, 1.88 * Math.PI, false);
+						ctx.stroke();
+
+						ctx.fillStyle = "rgba(120,30,220,0.16)";
+						ctx.beginPath();
+						ctx.arc(this.x - virusRadius * 0.16, this.y - virusRadius * 0.16, virusRadius * 0.055, 0, 2 * Math.PI, false);
+						ctx.arc(this.x + virusRadius * 0.2, this.y - virusRadius * 0.08, virusRadius * 0.04, 0, 2 * Math.PI, false);
+						ctx.fill();
+					}
 					ctx.restore();
+				} else {
+					ctx.stroke();
+					ctx.fill();
+					if (e) {
+						var skinDrawSize = 2 * this.size * 1.14;
+						ctx.save();
+						ctx.clip();
+						ctx.drawImage(e, this.x - skinDrawSize / 2, this.y - skinDrawSize / 2, skinDrawSize, skinDrawSize);
+						ctx.restore();
+					}
 				}
-				if ((showColor || 15 < this.size) && !b) {
+				if (!this.isVirus && !e && (showColor || 15 < this.size) && !b) {
 					ctx.strokeStyle = '#000000';
 					ctx.globalAlpha *= .1;
 					ctx.stroke();
@@ -2172,7 +2282,7 @@
 				var ncache;
 				//draw name
 				if (0 != this.id) {
-					var b = ~~this.y;
+					var b = this.y;
 					if ((showName || c) && this.name && this.nameCache) {
 						ncache = this.nameCache;
 						ncache.setValue(this.name);
@@ -2180,9 +2290,9 @@
 						var ratio = Math.ceil(10 * viewZoom) / 10;
 						ncache.setScale(ratio);
 						var rnchache = ncache.render(),
-							m = ~~(rnchache.width / ratio),
-							h = ~~(rnchache.height / ratio);
-						ctx.drawImage(rnchache, ~~this.x - ~~(m / 2), b - ~~(h / 2), m, h);
+							m = rnchache.width / ratio,
+							h = rnchache.height / ratio;
+						ctx.drawImage(rnchache, this.x - m / 2, b - h / 2, m, h);
 						b += rnchache.height / 2 / ratio + 4
 					}
 
@@ -2197,9 +2307,9 @@
 						ratio = Math.ceil(10 * viewZoom) / 10;
 						c.setScale(ratio);
 						e = c.render();
-						m = ~~(e.width / ratio);
-						h = ~~(e.height / ratio);
-						ctx.drawImage(e, ~~this.x - ~~(m / 2), b - ~~(h / 2), m, h);
+						m = e.width / ratio;
+						h = e.height / ratio;
+						ctx.drawImage(e, this.x - m / 2, b - h / 2, m, h);
 					}
 				}
 				ctx.restore()

@@ -175,9 +175,14 @@ module.exports = class ConfigService {
       virusMinAmount: 10, // Minimum amount of viruses on the map.
       virusMaxAmount: 50, // Maximum amount of viruses on the map. If this amount is reached, then ejected cells will pass through viruses.
       virusExplosionMult: 0.86,
-      virusStartMass: 100, // Starting virus size (In mass)
-      virusFeedAmount: 7, // Amount of times you need to feed a virus to shoot it
-      virusShotSpeed: 135, // Speed of a virus shot
+      virusStartMass: 90, // Normal virus size (In mass)
+      virusMiniMass: 60, // Smaller virus size (In mass)
+      virusMiniSpawnPercent: 25, // Chance for naturally spawned viruses to use the smaller size
+      virusMiniShotPercent: 30, // Chance for a virus shot to create the smaller size
+      virusFeedAmount: 1, // Amount of times you need to feed a virus to shoot it
+      virusBaseShots: 2, // How many times a naturally spawned virus can shoot
+      virusChildShots: 1, // How many times a child virus can shoot
+      virusShotSpeed: 92, // Base speed of a virus shot
       motherCellMassProtection: 1, // Stopping mothercells from being too big (0 to disable)
       motherCellMaxMass: 1000, // Max mass of a mothercell
       ejectMass: 12, // Mass of ejected cells

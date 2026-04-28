@@ -1,716 +1,110 @@
-<!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="utf-8">
-
-		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-		<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' data: *; media-src 'self' data: *; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' ws://localhost:3000 ws://127.0.0.1:3000 wss://localhost:3000 wss://127.0.0.1:3000; manifest-src 'self'; frame-src 'self' data:;" />
-		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-		<meta http-equiv="imagetoolbar" content="no" />
-
-		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-
-		<meta property="og:title" content="Blobz" />
-		<meta property="og:description" content="Blobz is a fast browser arena where you absorb, dodge, split, and outgrow the field." />
-		<meta property="og:url" content="https://github.com/beambotxyz-bit/Blobz" />
-		<meta property="og:image" content="img/blobz-banner.png" />
-		<meta property="og:image:width" content="1200" />
-		<meta property="og:image:height" content="630" />
-		<meta property="og:type" content="website" />
-
-		<title>Blobz</title>
-
-		<link rel="shortcut icon" href="img/blobz-mark.png" />
-		<link rel="icon" type="image/png" href="img/blobz-mark.png" />
-		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:700" type="text/css" />
-		<link rel="stylesheet" href="css/bootstrap-3.3.4.min.css">
-		<link rel="stylesheet" href="css/gallery.css">
-
-		<style>
-			#adsBottom, #canvas {
-				left: 0;
-				right: 0;
-				bottom: 0;
-				position: absolute
-			}
-
-			#adsBottom, #canvas, #chat_textbox, #helloDialog {
-				position: absolute;
-			}
-
-			.ui-dialog, body {
-				overflow: hidden
-			}
-
-			body {
-				padding: 0;
-				margin: 0
-			}
-
-			#canvas {
-				top: 0;
-				width: 100%;
-				height: 100%
-			}
-
-			.checkbox label {
-				margin-right: 10px
-			}
-
-			form {
-				margin-bottom: 0
-			}
-
-			.btn-play, .btn-settings, .btn-spectate {
-				display: block;
-				height: 35px
-			}
-
-			.btn-play {
-				width: 85%;
-				float: left
-			}
-
-			.btn-settings {
-				width: 13%;
-				float: right
-			}
-
-			.btn-spectate {
-				display: block;
-				float: right
-			}
-
-			.btn-play, .btn-settings, .btn-spectate {
-				display: block;
-				height: 35px;
-			}
-
-			.btn-play {
-				width: 55%;
-				margin-right: 10px;
-				margin-bottom: 10px;
-			}
-
-			.btn-settings {
-				width: 13%;
-			}
-
-			#helloDialog {
-				width: 350px;
-				background-color: #FFFFFF;
-				border-radius: 15px;
-				padding: 5px 15px 5px 15px;
-				position: absolute;
-				top: 50%;
-				left: 50%;
-				-webkit-transform: translate(-50%, -50%);
-				-ms-transform: translate(-50%, -50%);
-				transform: translate(-50%, -50%);
-			}
-
-			#chat_textbox {
-				-webkit-transition: all .5s ease-in-out;
-				-moz-transition: all .5s ease-in-out;
-				-o-transition: all .5s ease-in-out;
-				transition: all .5s ease-in-out;
-				z-index: 1;
-				bottom: 10px;
-				background: rgba(0, 0, 0, .2);
-				border: 0;
-				outline: 0;
-				color: #FFF;
-				height: 30px;
-				text-indent: 12px;
-				left: 10px;
-				width: 300px
-			}
-
-			#chat_textbox:focus {
-				background: rgba(0, 0, 0, .5)
-			}
-
-			#lb-hud {
-				position: absolute;
-				top: 12px;
-				left: 12px;
-				z-index: 150;
-				width: 46px;
-				min-height: 46px;
-			}
-
-			#lb-hud.is-hidden {
-				display: none;
-			}
-
-			#lb-hud.is-open {
-				width: min(226px, calc(100vw - 24px));
-			}
-
-			#lb-toggle {
-				position: relative;
-				z-index: 1;
-				width: 46px;
-				height: 46px;
-				padding: 0;
-				border: 1px solid rgba(255, 255, 255, 0.12);
-				border-radius: 14px;
-				background: rgba(10, 14, 20, 0.84);
-				color: #f2f5fa;
-				cursor: pointer;
-				outline: none;
-				display: inline-flex;
-				align-items: center;
-				justify-content: center;
-				box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-				transition: background-color .18s ease, border-color .18s ease, transform .18s ease, opacity .16s ease;
-			}
-
-			#lb-toggle:hover,
-			#lb-toggle:focus-visible,
-			#lb-toggle.is-active {
-				background: rgba(17, 23, 31, 0.96);
-				border-color: rgba(255, 255, 255, 0.2);
-				transform: translateY(-1px);
-			}
-
-			.lb-trigger-icon {
-				font-size: 24px;
-				line-height: 1;
-			}
-
-			#lb-hud.is-open #lb-toggle {
-				opacity: 0;
-				pointer-events: none;
-				transform: scale(.92);
-			}
-
-			#lb-panel {
-				position: absolute;
-				top: 0;
-				left: 0;
-				display: none;
-				width: min(226px, calc(100vw - 24px));
-				max-height: min(54vh, 300px);
-				overflow: hidden;
-				border: 1px solid rgba(255, 255, 255, 0.06);
-				border-radius: 14px;
-				background: rgba(7, 10, 15, 0.88);
-				box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
-				color: #edf2f8;
-				font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-			}
-
-			#lb-panel.is-open {
-				display: block;
-			}
-
-			.lb-panel-head {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 8px;
-				padding: 8px 10px 7px;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-			}
-
-			.lb-panel-title {
-				font-size: 11px;
-				font-weight: 600;
-				letter-spacing: .1em;
-				text-transform: uppercase;
-				color: #f7fafc;
-			}
-
-			#lb-close {
-				width: 25px;
-				height: 25px;
-				padding: 0;
-				border: 1px solid rgba(255, 99, 99, 0.2);
-				border-radius: 8px;
-				background: rgba(32, 9, 13, 0.46);
-				color: rgba(255, 232, 232, 0.9);
-				font: 15px/1 "Segoe UI", sans-serif;
-				cursor: pointer;
-				outline: none;
-			}
-
-			#lb-close:hover,
-			#lb-close:focus-visible {
-				background: rgba(56, 15, 22, 0.74);
-				border-color: rgba(255, 99, 99, 0.34);
-			}
-
-			.lb-panel-body {
-				padding: 8px 10px 10px;
-				max-height: calc(min(54vh, 300px) - 40px);
-				overflow-y: auto;
-			}
-
-			#lb-list {
-				display: grid;
-				gap: 2px;
-			}
-
-			.lb-row {
-				display: grid;
-				grid-template-columns: 18px minmax(0, 1fr) auto;
-				align-items: center;
-				gap: 6px;
-				min-height: 22px;
-				padding: 1px 0;
-				font-size: 12px;
-				font-weight: 400;
-				color: rgba(236, 242, 248, 0.92);
-			}
-
-			.lb-rank {
-				color: rgba(236, 242, 248, 0.76);
-			}
-
-			.lb-rank.is-podium {
-				color: #ffd74f;
-			}
-
-			.lb-name {
-				min-width: 0;
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-			}
-
-			.lb-mass {
-				color: #37e3db;
-				text-align: right;
-				white-space: nowrap;
-			}
-
-			.lb-self-wrap {
-				margin-top: 7px;
-				padding-top: 7px;
-				border-top: 1px solid rgba(255, 255, 255, 0.06);
-			}
-
-			.lb-row.is-self {
-				margin: 0 -3px;
-				padding: 6px 7px;
-				border-radius: 9px;
-				background: rgba(255, 255, 255, 0.07);
-			}
-
-			#lb-empty {
-				display: none;
-				padding: 6px 0 2px;
-				font-size: 12px;
-				font-weight: 400;
-				color: rgba(236, 242, 248, 0.62);
-			}
-
-			.lb-panel-foot {
-				margin-top: 8px;
-			}
-
-			#lb-exit-btn {
-				width: 100%;
-				padding: 7px 10px;
-				border: 1px solid rgba(255, 88, 88, 0.18);
-				border-radius: 10px;
-				background: rgba(21, 10, 12, 0.42);
-				color: rgba(255, 234, 234, 0.88);
-				font: 600 12px/1 "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-				letter-spacing: .03em;
-				cursor: pointer;
-				outline: none;
-			}
-
-			#lb-exit-btn:hover,
-			#lb-exit-btn:focus-visible {
-				background: rgba(36, 12, 17, 0.78);
-				border-color: rgba(255, 88, 88, 0.34);
-			}
-
-			#title {
-				padding: 10px;
-			}
-
-			#nick {
-				width: 65%;
-			}
-
-			#skin {
-				width: 33%;
-				float: right;
-			}
-
-			#gallery-btn {
-				width: 100%;
-				margin-bottom: 5px;
-				display: none; /* Visible when skins are loaded */
-			}
-
-			#settings {
-				max-height: min(48vh, 360px);
-				overflow-y: auto;
-				padding-right: 2px;
-			}
-
-			.settings-grid {
-				display: grid;
-				grid-template-columns: repeat(2, minmax(0, 1fr));
-				gap: 8px 12px;
-			}
-
-			.settings-grid label {
-				display: flex;
-				align-items: center;
-				gap: 6px;
-				margin: 0;
-				min-width: 0;
-			}
-
-			.settings-audio {
-				margin-top: 12px;
-				padding-top: 12px;
-				border-top: 1px solid rgba(15, 23, 42, 0.08);
-				display: grid;
-				gap: 10px;
-			}
-
-			.settings-heading {
-				font-size: 11px;
-				font-weight: 700;
-				letter-spacing: .08em;
-				text-transform: uppercase;
-				color: #5b6f89;
-			}
-
-			.audio-row {
-				display: grid;
-				grid-template-columns: minmax(0, 1fr) 96px 46px;
-				gap: 8px;
-				align-items: center;
-			}
-
-			.audio-toggle {
-				display: flex;
-				align-items: center;
-				gap: 6px;
-				margin: 0;
-				min-width: 0;
-			}
-
-			.audio-slider {
-				width: 100%;
-				margin: 0;
-			}
-
-			.audio-value {
-				font-size: 12px;
-				text-align: right;
-				color: #5b6f89;
-			}
-
-			.audio-row.is-disabled {
-				opacity: .55;
-			}
-
-			#footer {
-				text-align: center;
-				margin-bottom: 10px;
-				margin-top: -10px;
-			}
-
-			#a300x250 {
-				width: 300px;
-				height: 250px;
-				background-repeat: no-repeat;
-				background-size: contain;
-				background-position: center center
-			}
-
-			.ui-dialog {
-				background-color: #141414;
-				/*background-image: url(http://agariohub.tk/assets/img/texture.png);*/
-				z-index: 100000
-			}
-
-			.ui-widget-overlay {
-				overflow: hidden;
-				z-index: 1000000
-			}
-
-			.skinclick {
-				cursor: pointer;
-				padding: 2px;
-				position: relative;
-				right: -12px;
-				border-radius: 50%;
-				-webkit-transition: all .5s ease;
-				-moz-transition: all .5s ease;
-				-ms-transition: all .5s ease;
-				-o-transition: all .5s ease;
-				transition: all .5s ease;
-				border: 1px solid orange
-			}
-
-			.skinlist:hover {
-				cursor: pointer;
-			}
-
-			.skinclick:hover {
-				border: 1px solid #fff;
-				z-index: 99999999999999;
-				-webkit-transform: scale(2.25);
-				-moz-transform: scale(2.25);
-				-ms-transform: scale(2.25);
-				-o-transform: scale(2.25);
-				transform: scale(2.25)
-			}
-
-			hr.top {
-				margin-top: 5px;
-			}
-
-			h2 {
-				margin-top: 0;
-				margin-bottom: 0;
-			}
-
-			.grecaptcha-badge {
-				display: none;
-			}
-
-			@media (max-width: 640px) {
-				#helloDialog {
-					width: min(92vw, 350px);
-					padding: 8px 12px 10px;
-				}
-
-				#nick, #skin {
-					width: 100%;
-					float: none;
-					display: block !important;
-				}
-
-				#skin {
-					margin-top: 8px;
-				}
-
-				.btn-play {
-					width: calc(100% - 58px);
-					margin-right: 10px;
-				}
-
-				.btn-settings {
-					width: 48px;
-				}
-
-				#lb-hud {
-					top: 8px;
-					left: 8px;
-					width: 42px;
-					min-height: 42px;
-				}
-
-				#lb-hud.is-open {
-					width: min(208px, calc(100vw - 16px));
-				}
-
-				#lb-toggle {
-					width: 42px;
-					height: 42px;
-					border-radius: 13px;
-				}
-
-				.lb-trigger-icon {
-					font-size: 22px;
-				}
-
-				#lb-panel {
-					width: min(208px, calc(100vw - 16px));
-					max-height: min(52vh, 252px);
-					border-radius: 13px;
-				}
-
-				.lb-panel-head {
-					padding: 7px 9px 6px;
-				}
-
-				.lb-panel-body {
-					padding: 7px 9px 8px;
-					max-height: calc(min(52vh, 252px) - 36px);
-				}
-
-				.lb-row {
-					font-size: 11px;
-					gap: 5px;
-					min-height: 20px;
-				}
-
-				#lb-exit-btn {
-					padding: 7px 9px;
-					font-size: 11px;
-				}
-
-				#settings {
-					max-height: 44vh;
-				}
-
-				.settings-grid {
-					grid-template-columns: 1fr;
-				}
-
-				.audio-row {
-					grid-template-columns: 1fr;
-					gap: 6px;
-				}
-
-				.audio-value {
-					text-align: left;
-				}
-			}
-
-			@media (max-height: 540px) {
-				#settings {
-					max-height: 34vh;
-				}
-			}
-
-			@media (max-height: 460px) {
-				#lb-panel {
-					width: min(208px, calc(100vw - 16px));
-					max-height: min(74vh, 244px);
-				}
-
-				.lb-panel-head {
-					padding: 7px 9px 6px;
-				}
-
-				.lb-panel-body {
-					padding: 7px 9px 8px;
-					max-height: calc(min(74vh, 244px) - 36px);
-				}
-
-				.lb-row {
-					min-height: 19px;
-					font-size: 11px;
-				}
-
-				#lb-exit-btn {
-					padding: 7px 9px;
-					font-size: 11px;
-				}
-			}
-		</style>
-	</head>
-	<body>
-		<div id="gallery" style="display: none;">
-			<div id="gallery-content">
-				<div id="gallery-header">Blobz Skins</div>
-				<div id="gallery-body"></div>
-			</div>
-		</div>
-		<div id="overlays" style="display:none; position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 200;">
-			<div id="helloDialog">
-				<form id="form" role="form">
-					<div class="form-group">
-						<div><h2 id="title" class="text-center">Blobz</h2></div>
-						<hr class="top" />
-						<div class="text-center" style="display: block; color: #3b6ea8;">Blobz early access build</div>
-					</div>
-					<div class="form-group">
-						<input id="nick" class="form-control" style="display: inline-block;" placeholder="Nick" maxlength="15" />
-						<input id="skin" class="form-control" style="display: inline-block;" placeholder="Skin Name" maxlength="25" pattern="[a-zA-Z0-9_\- ]+" oninvalid="this.setCustomValidity('Only letters, numbers, spaces and \'_\' and \'-\') allowed')" onchange="try{setCustomValidity('')}catch(e){}" />
-					</div>
-					<div id="locationUnknown"></div>
-					<div class="form-group clearfix">
-						<button id="play-btn" class="btn btn-play btn-primary pull-left">Play</button>
-						<button id="spectate-btn" class="btn btn-warning btn-spectate pull-left">Spectate</button>
-						<button id="settings-btn" class="btn btn-info btn-settings pull-right"><i class="glyphicon glyphicon-cog"></i></button>
-						<button id="gallery-btn" class="btn btn-play btn-primary btn-needs-server btn-info">Choose Skin</button>
-					</div>
-					<div id="cantc" style="display:none;">
-						<h4>Cannot connect to server, click the reconnect button below to try again</h4><br>
-					</div>
-					<div class="checkbox" id="settings" style="display:none;">
-						<div class="settings-grid" style="margin: 6px;">
-							<label><input id="cskin" onchange="setSkins(!$(this).is(':checked'));" type="checkbox" /> No skins</label>
-							<label><input id="splitmacro" onchange="setSplitMacro($(this).is(':checked'));" type="checkbox" checked /> Split Macro</label>
-							<label><input id="feedmacro" onchange="setFeedMacro($(this).is(':checked'));" type="checkbox" checked /> Feed Macro</label>
-							<label><input id="ccolor" onchange="setColors($(this).is(':checked'));" type="checkbox" /> No colors</label>
-							<label><input id="cmass" onchange="setShowMass($(this).is(':checked'));" type="checkbox" /> Show mass</label>
-							<label><input id="cchat" onchange="setHideChat($(this).is(':checked'));" type="checkbox" /> Hide chat</label>
-							<label><input id="csmooth" onchange="setSmooth($(this).is(':checked'));" type="checkbox" /> Smooth Render</label>
-							<label><input id="cgrid" onchange="setHideGrid($(this).is(':checked'));" type="checkbox" />Hide Radar Grid</label>
-						</div>
-						<div class="settings-audio" style="margin: 6px;">
-							<div class="settings-heading">Audio</div>
-							<div class="audio-row" id="sound-effects-row">
-								<label class="audio-toggle"><input id="csounds" onchange="setPlaySounds($(this).is(':checked'));" type="checkbox" checked /> Sound Effects</label>
-								<input id="sound-volume" class="audio-slider" onchange="setSoundsVolume(this.value)" oninput="setSoundsVolume(this.value)" type="range" min="0" max="1" step="0.01" value="0.45" />
-								<span class="audio-value" id="sound-volume-value">45%</span>
-							</div>
-							<div class="audio-row" id="music-row">
-								<label class="audio-toggle"><input id="cmusic" onchange="setPlayMusic($(this).is(':checked'));" type="checkbox" checked /> Background Music</label>
-								<input id="music-volume" class="audio-slider" onchange="setMusicVolume(this.value)" oninput="setMusicVolume(this.value)" type="range" min="0" max="1" step="0.01" value="0.28" />
-								<span class="audio-value" id="music-volume-value">28%</span>
-							</div>
-						</div>
-					</div>
-				</form>
-				<hr />
-				<div id="instructions" class="text-center text-muted">
-					<div>Move your mouse to control your cell</div>
-					<div>Press <b>Space</b> to split</div>
-					<div>Press <b>C</b> for max split <b>x16</b></div>
-					<div>Press <b>W</b> to eject some mass</div>
-				</div>
-				<hr />
-				<div id="footer">
-					<span class="text-muted">Grow smart. Stay alive.</span>
-				</div>
-			</div>
-		</div>
-
-		<div id="connecting" style="display:none; position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 201; background-color: rgba(0,0,0,0.5);">
-			<div style="width: 350px; background-color: #fff; margin: 100px auto; border-radius: 15px; padding: 5px 15px 5px 15px;">
-				<h3>Connecting to Blobz...</h3><hr />
-				<div class="text-center" style="display: block; color: #3b6ea8;">Launching your local arena session</div>
-				<p>If you cannot connect, check whether your local Blobz server is running and whether a firewall is blocking the websocket connection.</p>
-			</div>
-		</div>
-
-		<canvas height="600" id="canvas" width="800"></canvas>
-		<div id="lb-hud" class="is-hidden">
-			<button id="lb-toggle" type="button" aria-label="Open leaderboard" aria-expanded="false" aria-controls="lb-panel">
-				<span class="lb-trigger-icon" aria-hidden="true">&#127942;</span>
-			</button>
-			<div id="lb-panel" aria-label="Leaderboard panel">
-				<div class="lb-panel-head">
-					<div class="lb-panel-title">Leaderboard</div>
-					<button id="lb-close" type="button" aria-label="Close leaderboard">&times;</button>
-				</div>
-				<div class="lb-panel-body">
-					<div id="lb-list"></div>
-					<div id="lb-self" class="lb-self-wrap" style="display:none;"></div>
-					<div id="lb-empty">Waiting for players...</div>
-					<div class="lb-panel-foot">
-						<button id="lb-exit-btn" type="button">&times; Exit Game</button>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<form>
-			<input id="chat_textbox" maxlength="70" autocomplete="off" placeholder="Press Enter to chat!" type="text" />
-		</form>
-
-		<div id="skins" style="display: none;" title="Blobz Skins"></div>
-
-		<script src="js/jquery-2.1.4.min.js"></script>
-		<script src="js/fp.umd.min.js"></script>
-		<script src="js/vector2.js"></script>
-		<script src="js/main.js?v=50"></script>
-		<script src="js/interface.js?v=4"></script>
-	</body>
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' data: *; media-src 'self' data: *; style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com; font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com data:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' ws: wss:; manifest-src 'self'; frame-src 'self' data:;">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Blobz</title>
+<link rel="shortcut icon" href="/img/blobz-mark.png">
+<link rel="icon" type="image/png" href="/img/blobz-mark.png">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="/css/blobstars-lobby.css?v=7">
+<link rel="stylesheet" href="/css/blobstars-lobby-integration.css?v=7">
+</head>
+<body class="blobz-lobby-page">
+<div class="bg-layer"></div>
+    <div class="nebula-glow"></div>
+    <div class="bg-grid"></div>
+    <div class="smoke-clouds"></div>
+    <div class="void-cells" aria-hidden="true">
+        <span class="cell ghost drift-b" style="--cell-x:4%; --cell-y:11%; --cell-size:22px; --cell-fill:rgba(168,84,255,0.26); --cell-alpha:0.38; --cell-alpha-hi:0.5; --cell-blur:3px; --duration:28s; --pulse:13s;"></span>
+        <span class="cell ghost drift-c" style="--cell-x:24%; --cell-y:6%; --cell-size:54px; --cell-fill:rgba(160,72,255,0.14); --cell-alpha:0.18; --cell-alpha-hi:0.26; --cell-blur:4px; --duration:31s; --pulse:16s; --delay:-7s;"></span>
+        <span class="cell ghost drift-a" style="--cell-x:24%; --cell-y:22%; --cell-size:30px; --cell-fill:rgba(76,112,255,0.2); --cell-alpha:0.24; --cell-alpha-hi:0.32; --cell-blur:2px; --duration:26s; --pulse:12s; --delay:-4s;"></span>
+        <span class="cell drift-b mobile-hide" style="--cell-x:73%; --cell-y:10%; --cell-size:44px; --cell-fill:rgba(239,58,198,0.96); --cell-hi:rgba(255,190,235,0.72); --cell-ring:rgba(100,12,85,0.9); --cell-glow:rgba(239,58,198,0.24); --cell-alpha:0.94; --cell-alpha-hi:1; --duration:25s; --pulse:10s;"></span>
+        <span class="cell drift-c" style="--cell-x:96%; --cell-y:16%; --cell-size:48px; --cell-fill:rgba(43,122,255,0.92); --cell-hi:rgba(176,213,255,0.7); --cell-ring:rgba(8,49,122,0.9); --cell-glow:rgba(43,122,255,0.22); --cell-alpha:0.92; --cell-alpha-hi:1; --duration:24s; --pulse:11s; --delay:-8s;"></span>
+        <span class="cell drift-a" style="--cell-x:95%; --cell-y:29%; --cell-size:36px; --cell-fill:rgba(255,163,41,0.96); --cell-hi:rgba(255,228,165,0.76); --cell-ring:rgba(128,64,0,0.9); --cell-glow:rgba(255,163,41,0.25); --cell-alpha:0.94; --cell-alpha-hi:1; --duration:20s; --pulse:9s; --delay:-6s;"></span>
+        <span class="cell drift-c" style="--cell-x:17%; --cell-y:50%; --cell-size:34px; --cell-fill:rgba(240,60,205,0.94); --cell-hi:rgba(255,180,237,0.76); --cell-ring:rgba(123,13,103,0.88); --cell-glow:rgba(240,60,205,0.22); --cell-alpha:0.92; --cell-alpha-hi:1; --duration:23s; --pulse:10s; --delay:-3s;"></span>
+        <span class="cell drift-b" style="--cell-x:42%; --cell-y:42%; --cell-size:38px; --cell-fill:rgba(53,201,228,0.94); --cell-hi:rgba(193,250,255,0.74); --cell-ring:rgba(12,89,102,0.9); --cell-glow:rgba(53,201,228,0.2); --cell-alpha:0.9; --cell-alpha-hi:0.98; --duration:21s; --pulse:9s; --delay:-5s;"></span>
+        <span class="cell drift-a" style="--cell-x:58%; --cell-y:43%; --cell-size:33px; --cell-fill:rgba(222,48,234,0.92); --cell-hi:rgba(255,178,250,0.74); --cell-ring:rgba(111,10,118,0.88); --cell-glow:rgba(222,48,234,0.2); --cell-alpha:0.9; --cell-alpha-hi:0.98; --duration:24s; --pulse:10s; --delay:-10s;"></span>
+        <span class="cell drift-c" style="--cell-x:74%; --cell-y:40%; --cell-size:20px; --cell-fill:rgba(168,70,255,0.9); --cell-hi:rgba(233,196,255,0.7); --cell-ring:rgba(87,18,126,0.9); --cell-glow:rgba(168,70,255,0.18); --cell-alpha:0.88; --cell-alpha-hi:0.95; --duration:20s; --pulse:8s; --delay:-1s;"></span>
+        <span class="cell ghost drift-b" style="--cell-x:44%; --cell-y:59%; --cell-size:28px; --cell-fill:rgba(95,192,233,0.18); --cell-alpha:0.22; --cell-alpha-hi:0.3; --cell-blur:2px; --duration:27s; --pulse:13s; --delay:-9s;"></span>
+        <span class="cell drift-a" style="--cell-x:3%; --cell-y:68%; --cell-size:34px; --cell-fill:rgba(238,64,221,0.94); --cell-hi:rgba(255,191,241,0.76); --cell-ring:rgba(118,14,109,0.9); --cell-glow:rgba(238,64,221,0.2); --cell-alpha:0.9; --cell-alpha-hi:0.98; --duration:22s; --pulse:9s; --delay:-12s;"></span>
+        <span class="cell ghost drift-c" style="--cell-x:96%; --cell-y:78%; --cell-size:64px; --cell-fill:rgba(109,208,255,0.16); --cell-alpha:0.18; --cell-alpha-hi:0.24; --cell-blur:4px; --duration:30s; --pulse:15s; --delay:-6s;"></span>
+    </div>
+    
+    <div class="lobby">
+        <div class="logo">BLOBSTARS</div>
+        <div class="top-row">
+            <div class="profile-pill" id="profileTrigger" onclick="openModal('profile')">
+                <div class="avatar"><img id="profileAvatar" src="/skins/Base.png" alt="Current skin preview"></div>
+                <div class="info">
+                    <div class="name-row">
+                        <span class="name" id="profileName">BITGRAF</span>
+                        <span class="level" id="profileTag">LVL 42</span>
+                    </div>
+                    <div class="xp-text">3 240 / 6 400 XP</div>
+                    <div class="xp-bar-bg">
+                        <div class="xp-bar-fill" id="profileProgressBar"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="currency-hub">
+                <div class="gem-pill" onclick="openModal('market')">
+                    <i class="fa-solid fa-gem gem-icon"></i>
+                    <span id="gem-amount">42.4K</span>
+                    <div class="gem-plus"><i class="fa-solid fa-plus"></i></div>
+                </div>
+                <div class="icon-btn desktop-only-btn" onclick="openModal('settings')"><i class="fa-solid fa-sliders"></i></div>
+                <div class="icon-btn mobile-menu-btn" onclick="openModal('settings')"><i class="fa-solid fa-bars"></i></div>
+            </div>
+        </div>
+        
+        <div class="center-stage">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                <div class="play-btn-wrap">
+                    <div class="play-btn-glow"></div>
+                    <button class="play-btn" id="launchTrigger" onclick="launchGame('play')"><i class="fa-solid fa-play"></i></button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bottom-dock">
+            <div class="nav-item" data-modal="inventory" onclick="openModal('inventory')"><i class="fa-solid fa-box-open" style="color: #00e5ff;"></i><span>ASSETS</span></div>
+            <div class="nav-item" data-modal="market" onclick="openModal('market')"><i class="fa-solid fa-store" style="color: #ffaa00;"></i><span>MARKET</span></div>
+            <div class="nav-item active" data-modal="home" onclick="closeModal()"><div class="mini-blob-mascot"></div><span>BLOBSTARS</span></div>
+            <div class="nav-item" data-modal="ranking" onclick="openModal('ranking')"><i class="fa-solid fa-ranking-star" style="color: gold;"></i><span>LADDER</span></div>
+            <div class="nav-item" data-modal="tasks" onclick="openModal('tasks')"><i class="fa-solid fa-clipboard-list" style="color: #39ff14;"></i><span>TASKS</span></div>
+        </div>
+        
+        <div class="side-rail desktop-only">
+            <div class="rail-item" onclick="openModal('daily')"><i class="fa-solid fa-gift"></i><div class="rail-badge">1</div></div>
+            <div class="rail-item" onclick="openModal('invite')"><i class="fa-solid fa-user-group"></i></div>
+            <div class="rail-item" onclick="openModal('ranking')"><i class="fa-solid fa-ranking-star"></i></div>
+            <div class="rail-item" onclick="openModal('tasks')"><i class="fa-solid fa-calendar-check"></i></div>
+        </div>
+    </div>
+
+    <!-- Universal Modal System -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-card premium-panel">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">TITLE</h2>
+                <div class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></div>
+            </div>
+            <div class="modal-content" id="modalContent">
+                <!-- Content Injected -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Central Dialogue Popup Modal -->
+    <div class="modal-overlay" id="dialogueOverlay" style="z-index: 200; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px);">
+        <div id="dialogueCard" style="width: 100%; max-width: 320px; padding: 2.5rem 1.5rem 1.5rem; display: flex; flex-direction: column; align-items: center; position: relative; background: rgba(10, 10, 15, 0.95); border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); transition: box-shadow 0.3s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: scale(0.95); box-shadow: 0 15px 50px rgba(0,0,0,0.8);">
+            <!-- Content injected via JS -->
+        </div>
+    </div>
+<script src="/js/blobstars-lobby.js?v=7"></script>
+</body>
 </html>

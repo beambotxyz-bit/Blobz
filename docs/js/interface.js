@@ -1,6 +1,6 @@
 $(function() {
 	var socketHost = window.location.hostname || '127.0.0.1';
-	var socketUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + socketHost + ':3000/ws1/';
+	var socketUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + socketHost + ':9999/ws1/';
 	var FP = FingerprintJS.load();
 	var externallyFramed;
 	var playerIdent;
@@ -21,6 +21,13 @@ $(function() {
 		nick: 'agarv1nick',
 		skin: 'agarv1skin'
 	};
+
+	// Check for URL parameters (from lobby)
+	var urlParams = new URLSearchParams(window.location.search);
+	var nickFromUrl = urlParams.get('nick');
+	var skinFromUrl = urlParams.get('skin');
+	var isSpectating = urlParams.get('spectate') === '1';
+	var isFromLobby = !!(nickFromUrl || isSpectating);
 
 	try {
 		externallyFramed = window.top.location.host !== window.location.host;
@@ -102,7 +109,7 @@ $(function() {
 		return currentSkin;
 	}
 
-	$.get('skinList.txt', function(data, status) {
+	$.get('/skinList.txt', function(data, status) {
 		if (status === 'success') {
 			var skins = normalizeSkinList(data);
 			if (skins.length === 0) return;
@@ -112,7 +119,7 @@ $(function() {
 
 			$('#gallery-btn').css('display', 'inline-block');
 
-			$.get('fpBanList.txt').success(function(data) {
+			$.get('/fpBanList.txt').success(function(data) {
 				var fp = data.split(',');
 
 				for (var p of fp) bannedIdent.push(p);
@@ -136,7 +143,42 @@ $(function() {
 						$('#connecting div').html('<h3 style="text-align: center">You are banned</h3><hr class="top" /><p style="text-align: center">You are banned from Blobz because of repeated rule violations.</p>' + getSupportMessage() + '<h1 style="text-align: center;">Your unban code is<br /><br />' + btoa(playerIdent).replace(/(.{10})/g, "$1<br />") + '</h1>');
 						$('#connecting').show();
 					} else {
-						$('#overlays').show();
+						// If coming from lobby, auto-connect with nick and skin
+						if (isFromLobby) {
+							if (nickFromUrl) $nick.val(decodeURIComponent(nickFromUrl));
+							if (skinFromUrl) $skin.val(decodeURIComponent(skinFromUrl));
+							$('#overlays').hide();
+							$('#connecting').show();
+							
+							// Auto-send nick once connected
+							var attemptAutoNick = function() {
+								if (typeof window.ws !== 'undefined' && window.ws && window.ws.readyState === 1) {
+									// WebSocket is connected, send the nick
+									if (isSpectating) {
+										// For spectate mode
+										window.setNick('');
+									} else if (nickFromUrl) {
+										// For play mode
+										var nick = decodeURIComponent(nickFromUrl);
+										var skin = getPlayableSkin();
+										var finalNick = '<' + skin + '|' + (playerIdent ? playerIdent : '') + '>' + sanitizeNick(nick);
+										window.setNick(finalNick);
+									}
+									return true;
+								}
+								return false;
+							};
+							
+							// Try to send nick immediately, then retry every 100ms until connected
+							var autoNickInterval = setInterval(function() {
+								if (attemptAutoNick()) {
+									clearInterval(autoNickInterval);
+								}
+							}, 100);
+						} else {
+							// Show overlays for legacy direct access to game.html
+							$('#overlays').show();
+						}
 						connect(socketUrl);
 
 						clearInterval(interval);
@@ -164,12 +206,16 @@ $(function() {
 					}
 				});
 			}).error(function() {
-				$('#overlays').show();
+				if (!isFromLobby) {
+					$('#overlays').show();
+				}
 				connect(socketUrl);
 			});
 		}
 	}).error(function() {
-		$('#overlays').show();
+		if (!isFromLobby) {
+			$('#overlays').show();
+		}
 		connect(socketUrl);
 	});
 

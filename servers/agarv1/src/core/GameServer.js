@@ -315,6 +315,191 @@ module.exports = class GameServer {
     return this.generatorService.startFood();
   }
 
+  getBlobzApiBase() {
+    return (process.env.BLOBZ_API_BASE || 'http://127.0.0.1:8787').replace(/\/+$/, '');
+  }
+
+  getBlobzInternalToken() {
+    return process.env.BLOBZ_INTERNAL_API_TOKEN || process.env.INTERNAL_API_TOKEN || 'blobz-dev-internal-token-change-me';
+  }
+
+  getBlobzWorldSlug() {
+    let raw = process.env.BLOBZ_WORLD_SLUG || this.name || 'main';
+    let slug = String(raw)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return slug || 'main';
+  }
+
+  getBlobzWorldPort() {
+    let port = Number.parseInt(process.env.BLOBZ_WORLD_PORT || this.port || this.config.serverPort, 10);
+    return Number.isFinite(port) ? port : this.config.serverPort;
+  }
+
+  getBlobzWorldWsUrl() {
+    if (process.env.BLOBZ_WORLD_WS_URL) return process.env.BLOBZ_WORLD_WS_URL;
+    let host = process.env.BLOBZ_WORLD_HOST || '127.0.0.1';
+    return 'ws://' + host + ':' + this.getBlobzWorldPort() + '/ws1/';
+  }
+
+  getBlobzWorldCounts() {
+    let counts = {
+      players: 0,
+      bots: 0,
+      spectators: 0
+    };
+    let clients = this.getClients();
+    for (let i = 0; i < clients.length; i++) {
+      let socket = clients[i];
+      if (!socket || !socket.playerTracker) continue;
+      if (typeof socket.remoteAddress === 'undefined') {
+        counts.bots++;
+        continue;
+      }
+      if (socket.playerTracker.spectate && socket.playerTracker.cells.length === 0) {
+        counts.spectators++;
+      } else {
+        counts.players++;
+      }
+    }
+    return counts;
+  }
+
+  sendBlobzWorldHeartbeat() {
+    let counts = this.getBlobzWorldCounts();
+    request({
+      url: this.getBlobzApiBase() + '/internal/worlds/heartbeat',
+      method: 'POST',
+      json: true,
+      timeout: 2500,
+      headers: {
+        'X-Internal-Token': this.getBlobzInternalToken()
+      },
+      body: {
+        slug: this.getBlobzWorldSlug(),
+        name: this.name || 'Main Arena',
+        mode: 'classic',
+        region: process.env.BLOBZ_WORLD_REGION || 'eu',
+        status: this.running ? 'active' : 'paused',
+        host: process.env.BLOBZ_WORLD_HOST || '127.0.0.1',
+        port: this.getBlobzWorldPort(),
+        wsUrl: this.getBlobzWorldWsUrl(),
+        pid: process.pid,
+        currentPlayers: counts.players,
+        currentBots: counts.bots,
+        currentSpectators: counts.spectators,
+        tickRate: this.config.serverFPS || 0,
+        loadScore: counts.players + counts.spectators * 0.2 + counts.bots * 0.1,
+        metadata: {
+          gameMode: this.gameMode && this.gameMode.name ? this.gameMode.name : 'unknown',
+          nodeCount: this.getWorld().getNodes().toArray().length
+        }
+      }
+    }, function(error, response, body) {
+      if (error || !response || response.statusCode >= 400) {
+        this.blobzHeartbeatFailures = (this.blobzHeartbeatFailures || 0) + 1;
+        if (this.blobzHeartbeatFailures === 1 || this.blobzHeartbeatFailures % 12 === 0) {
+          console.log('[Blobz API] World heartbeat failed: ' + (error || (body && body.error && body.error.message) || 'HTTP ' + (response && response.statusCode)));
+        }
+        return;
+      }
+      this.blobzHeartbeatFailures = 0;
+    }.bind(this));
+  }
+
+  startBlobzWorldHeartbeat() {
+    if (this.blobzHeartbeatInterval) return;
+    setTimeout(this.sendBlobzWorldHeartbeat.bind(this), 500);
+    this.blobzHeartbeatInterval = setInterval(this.sendBlobzWorldHeartbeat.bind(this), 5000);
+  }
+
+  stopBlobzWorldHeartbeat() {
+    if (!this.blobzHeartbeatInterval) return;
+    clearInterval(this.blobzHeartbeatInterval);
+    this.blobzHeartbeatInterval = null;
+  }
+
+  attachBlobzAccount(ws, sessionToken) {
+    if (!ws || !ws.playerTracker || !sessionToken) return;
+    let apiBase = this.getBlobzApiBase();
+    request({
+      url: apiBase + '/me',
+      method: 'GET',
+      json: true,
+      timeout: 2500,
+      headers: {
+        Authorization: 'Bearer ' + sessionToken
+      }
+    }, function(error, response, body) {
+      if (error || !response || response.statusCode !== 200 || !body || !body.player) {
+        console.log('[Blobz API] Session verification failed for ' + ws.remoteAddress);
+        return;
+      }
+      let player = body.player;
+      ws.playerTracker.blobzPlayerId = player.id;
+      ws.playerTracker.blobzUsername = player.username || player.displayName || '';
+      ws.playerTracker.blobzMatchStartedAt = Date.now();
+      ws.playerTracker.blobzMatchFinalized = false;
+      console.log('[Blobz API] Linked player ' + player.id + ' to socket ' + ws.remoteAddress);
+    });
+  }
+
+  updateBlobzBestMass(client) {
+    if (!client || !client.blobzStats) return 0;
+    let score = Math.max(0, Math.floor(client.getScore(true) || 0));
+    client.blobzStats.maxMass = Math.max(client.blobzStats.maxMass || 0, score);
+    return score;
+  }
+
+  finalizeBlobzMatch(client, exitReason) {
+    if (!client || !client.blobzPlayerId || client.blobzMatchFinalized) return;
+    client.blobzMatchFinalized = true;
+
+    let now = Date.now();
+    let startedAt = client.blobzMatchStartedAt || now;
+    let finalMass = this.updateBlobzBestMass(client);
+    let stats = client.blobzStats || {};
+
+    request({
+      url: this.getBlobzApiBase() + '/internal/matches/finalize',
+      method: 'POST',
+      json: true,
+      timeout: 3500,
+      headers: {
+        'X-Internal-Token': this.getBlobzInternalToken()
+      },
+      body: {
+        playerId: client.blobzPlayerId,
+        worldSlug: this.getBlobzWorldSlug(),
+        exitReason: exitReason || 'disconnect',
+        startedAt: new Date(startedAt).toISOString(),
+        endedAt: new Date(now).toISOString(),
+        stats: {
+          survivalSeconds: Math.max(0, Math.floor((now - startedAt) / 1000)),
+          foodEaten: Math.max(0, Math.floor(stats.foodEaten || 0)),
+          xpPickups: Math.max(0, Math.floor(stats.xpPickups || 0)),
+          gemPickups: Math.max(0, Math.floor(stats.gemPickups || 0)),
+          kills: Math.max(0, Math.floor(stats.kills || 0)),
+          deaths: exitReason === 'death' ? 1 : 0,
+          maxMass: Math.max(0, Math.floor(stats.maxMass || finalMass || 0)),
+          finalMass: exitReason === 'death' ? 0 : finalMass
+        },
+        metadata: {
+          world: this.name || 'main',
+          worldSlug: this.getBlobzWorldSlug(),
+          serverPort: this.getBlobzWorldPort()
+        }
+      }
+    }, function(error, response, body) {
+      if (error || !response || response.statusCode >= 400) {
+        console.log('[Blobz API] Match finalization failed for player ' + client.blobzPlayerId + ': ' + (error || (body && body.error && body.error.message) || 'HTTP ' + (response && response.statusCode)));
+        return;
+      }
+      console.log('[Blobz API] Finalized match for player ' + client.blobzPlayerId);
+    });
+  }
+
   start() {
 
     // Logging
@@ -328,10 +513,14 @@ module.exports = class GameServer {
 
     // Start the server
     var port = (this.port) ? this.port : this.config.serverPort;
-    this.socketServer = new WebSocket.Server({
+    let listenOptions = {
       port: (this.config.vps == 1) ? process.env.PORT : port,
       perMessageDeflate: false
-    }, function () {
+    };
+    if (process.env.BLOBZ_WORLD_BIND_HOST) {
+      listenOptions.host = process.env.BLOBZ_WORLD_BIND_HOST;
+    }
+    this.socketServer = new WebSocket.Server(listenOptions, function () {
       // Spawn starting food
       this.generatorService.init();
       this.generatorService.start();
@@ -383,6 +572,7 @@ module.exports = class GameServer {
       if (this.config.vps == 1) {
         console.log("\x1b[31m[IMPORTANT] You are using a VPS provider. Stats server and port choosing is disabled.\x1b[0m")
       }
+      this.startBlobzWorldHeartbeat();
       let game = this; // <-- todo what is this?
     }.bind(this));
 
@@ -427,6 +617,9 @@ module.exports = class GameServer {
         ws.close();
         return;
       }
+
+      const blobzQuery = urll.parse(ws.upgradeReq.url, true).query || {};
+      const blobzSessionToken = blobzQuery.session || '';
 
       let showlmsg = this.config.showjlinfo;
 
@@ -535,6 +728,7 @@ module.exports = class GameServer {
         this.server.log.onDisconnect(this.socket.remoteAddress);
 
         let client = this.socket.playerTracker;
+        this.server.finalizeBlobzMatch(client, 'disconnect');
         let len = this.socket.playerTracker.cells.length;
 
         for (let i = 0; i < len; i++) {
@@ -562,6 +756,7 @@ module.exports = class GameServer {
 
       ws.playerTracker = new PlayerTracker(this, ws);
       ws.packetHandler = new PacketHandler(this, ws);
+      this.attachBlobzAccount(ws, blobzSessionToken);
       ws.on('message', ws.packetHandler.handleMessage.bind(ws.packetHandler));
       ws.on('error', function err(error) {
         console.log("[WARN] Caught ws error. Prevented server crash. Error: " + error);
@@ -697,6 +892,9 @@ module.exports = class GameServer {
   };
 
   stop() {
+    this.stopBlobzWorldHeartbeat();
+    this.running = false;
+    this.sendBlobzWorldHeartbeat();
     this.socketServer.close();
     this.statServer.stop()
   }
@@ -1626,62 +1824,67 @@ module.exports = class GameServer {
     return true;
   }
 
-  ejectBiggest(client) {
-    let cell = client.getBiggestc();
+  canCellEjectMass(cell) {
     if (!cell) {
-      return;
+      return false;
     }
     if (this.config.ejectvirus != 1) {
-      if (cell.mass < this.config.playerMinMassEject) {
-        return;
-      }
-    } else {
-      if (cell.mass < this.config.playerminviruseject) {
-        return;
-      }
-
+      return cell.mass >= this.config.playerMinMassEject;
     }
-    this.ejectCellFromPlayer(client, cell);
+    return cell.mass >= this.config.playerminviruseject;
+  }
+
+  ejectBiggest(client) {
+    let cell = client.getBiggestc();
+    if (!this.canCellEjectMass(cell)) {
+      return false;
+    }
+    return this.ejectCellFromPlayer(client, cell);
   }
 
   // todo refactor this is way to long and does way to many different things
   ejectMass(client) {
 
-    if (this.onWVerify(client)) {
+    if (!this.onWVerify(client)) {
+      return;
+    }
+
+    let ejectedCells = 0; // How many cells have been ejected
+    if (this.config.ejectbiggest == 1) {
+      if (!this.canCellEjectMass(client.getBiggestc())) {
+        return;
+      }
       if (!this.canEjectMass(client)) {
         return;
       }
-      let player = client;
-      let ejectedCells = 0; // How many cells have been ejected
-      if (this.config.ejectbiggest == 1) {
-        this.ejectBiggest(client);
-      } else {
-        for (let i = 0; i < client.cells.length; i++) {
-          let cell = client.cells[i];
-          if (!cell) {
-            continue;
-          }
-          if (this.config.ejectvirus != 1) {
-            if (cell.mass < this.config.playerMinMassEject) {
-              continue;
-            }
-          } else {
-            if (cell.mass < this.config.playerminviruseject) {
-              continue;
-            }
-
-          }
-
-          if (this.ejectCellFromPlayer(client, cell)) {
-            ejectedCells++;
-          }
+      if (this.ejectBiggest(client)) {
+        ejectedCells++;
+      }
+    } else {
+      let eligibleCells = [];
+      for (let i = 0; i < client.cells.length; i++) {
+        let cell = client.cells[i];
+        if (this.canCellEjectMass(cell)) {
+          eligibleCells.push(cell);
         }
       }
-      if (ejectedCells > 0) {
-        client.actionMult += 0.065;
-        // Using W to give to a teamer is very frequent, so make sure their mult will be lost slower
-        client.actionDecayMult *= 0.99999;
+      if (eligibleCells.length <= 0) {
+        return;
       }
+      if (!this.canEjectMass(client)) {
+        return;
+      }
+      for (let i = 0; i < eligibleCells.length; i++) {
+        if (this.ejectCellFromPlayer(client, eligibleCells[i])) {
+          ejectedCells++;
+        }
+      }
+    }
+
+    if (ejectedCells > 0) {
+      client.actionMult += 0.065;
+      // Using W to give to a teamer is very frequent, so make sure their mult will be lost slower
+      client.actionDecayMult *= 0.99999;
     }
   };
 

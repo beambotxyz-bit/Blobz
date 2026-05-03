@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blobz Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">B</span>
+        <div>
+          <strong>Blobz Admin</strong>
+          <small>Worlds and economy ops</small>
+        </div>
+      </div>
+      <nav aria-label="Admin sections">
+        <a href="#overview">Overview</a>
+        <a href="#worlds">Worlds</a>
+        <a href="#players">Players</a>
+        <a href="#matches">Matches</a>
+      </nav>
+      <div class="token-box">
+        <label for="adminToken">Admin token</label>
+        <input id="adminToken" type="password" autocomplete="off" placeholder="X-Admin-Token">
+        <button id="saveToken" type="button">Save</button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Operations</p>
+          <h1>Live Control Panel</h1>
+        </div>
+        <div class="top-actions">
+          <span id="statusPill" class="status-pill muted">Waiting</span>
+          <button id="refreshBtn" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <section id="overview" class="metrics" aria-label="Overview metrics">
+        <article>
+          <span>Total players</span>
+          <strong id="metricPlayers">0</strong>
+        </article>
+        <article>
+          <span>Active worlds</span>
+          <strong id="metricWorlds">0</strong>
+        </article>
+        <article>
+          <span>Players online</span>
+          <strong id="metricOnline">0</strong>
+        </article>
+        <article>
+          <span>Matches today</span>
+          <strong id="metricMatches">0</strong>
+        </article>
+        <article>
+          <span>Supervisor</span>
+          <strong id="metricSupervisor">Off</strong>
+        </article>
+      </section>
+
+      <section id="worlds" class="section-grid">
+        <div class="section-main">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">World registry</p>
+              <h2>Game Worlds</h2>
+            </div>
+            <button id="testAssignBtn" type="button">Test Assignment</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>World</th>
+                  <th>Status</th>
+                  <th>Capacity</th>
+                  <th>Port</th>
+                  <th>Heartbeat</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="worldRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <form id="createWorldForm" class="side-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">Create</p>
+              <h2>New World</h2>
+            </div>
+          </div>
+          <label>
+            Name
+            <input name="name" type="text" placeholder="EU Arena 2" required>
+          </label>
+          <label>
+            Slug
+            <input name="slug" type="text" placeholder="eu-2">
+          </label>
+          <div class="form-row">
+            <label>
+              Port
+              <input name="port" type="number" min="1" max="65535" placeholder="10000">
+            </label>
+            <label>
+              Region
+              <input name="region" type="text" value="eu">
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              Soft cap
+              <input name="softCap" type="number" min="1" value="70">
+            </label>
+            <label>
+              Hard cap
+              <input name="hardCap" type="number" min="1" value="100">
+            </label>
+          </div>
+          <button type="submit">Create World</button>
+          <p class="hint">New rows enter rotation when status is active and a game process heartbeats on that port.</p>
+        </form>
+      </section>
+
+      <section id="players" class="section-main">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Accounts</p>
+            <h2>Recent Players</h2>
+          </div>
+          <input id="playerSearch" class="search" type="search" placeholder="Search name">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Level</th>
+                <th>XP</th>
+                <th>Gems</th>
+                <th>Cups</th>
+                <th>Skin</th>
+              </tr>
+            </thead>
+            <tbody id="playerRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="matches" class="section-grid two-columns">
+        <div class="section-main">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Economy</p>
+              <h2>Recent Matches</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>World</th>
+                  <th>Survival</th>
+                  <th>Kills</th>
+                  <th>Rewards</th>
+                </tr>
+              </thead>
+              <tbody id="matchRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="side-panel">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">Audit</p>
+              <h2>World Events</h2>
+            </div>
+          </div>
+          <ol id="eventList" class="event-list"></ol>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <template id="emptyRowTemplate">
+    <tr>
+      <td colspan="6" class="empty">No data yet.</td>
+    </tr>
+  </template>
+
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

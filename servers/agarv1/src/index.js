@@ -12,9 +12,18 @@ process.stdout.write("\u001b[2J\u001b[0;0H");
 process.argv.forEach(function (val) {
   if (val == "--noconsole") {
     showConsole = false;
+  } else if (val.indexOf("--port=") === 0) {
+    process.env.BLOBZ_WORLD_PORT = val.slice("--port=".length);
+  } else if (val.indexOf("--world=") === 0) {
+    process.env.BLOBZ_WORLD_SLUG = val.slice("--world=".length);
+  } else if (val.indexOf("--region=") === 0) {
+    process.env.BLOBZ_WORLD_REGION = val.slice("--region=".length);
   } else if (val == "--help") {
     console.log("Proper Usage: node index.js");
     console.log("    --noconsole         Disables the console");
+    console.log("    --port=10000        Runs this world on a specific websocket port");
+    console.log("    --world=eu-2        Sets the Blobz world slug used by the API");
+    console.log("    --region=eu         Sets the Blobz world region used by the API");
     console.log("    --help              Help menu.");
     console.log("    --expose-gc         Enables garbage collection")
     console.log("");

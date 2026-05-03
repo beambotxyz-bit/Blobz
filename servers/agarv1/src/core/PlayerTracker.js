@@ -73,6 +73,17 @@ module.exports = class PlayerTracker {
     this.reservedNames = [];
     this.minioncontrol = false;
     this.premium = '';
+    this.blobzPlayerId = null;
+    this.blobzUsername = null;
+    this.blobzMatchStartedAt = 0;
+    this.blobzMatchFinalized = false;
+    this.blobzStats = {
+      foodEaten: 0,
+      xpPickups: 0,
+      gemPickups: 0,
+      kills: 0,
+      maxMass: 0
+    };
     this.nodeDestroyQueue = [];
     this.visibleNodes = [];
     this.vfail = 0;
@@ -211,6 +222,9 @@ module.exports = class PlayerTracker {
     if (reCalcScore) {
       this.score = 0;
       this.cells.forEach((cell)=>this.score += cell.mass);
+    }
+    if (this.blobzStats) {
+      this.blobzStats.maxMass = Math.max(this.blobzStats.maxMass || 0, Math.floor(this.score || 0));
     }
     return Math.floor(this.score);
   };

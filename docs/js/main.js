@@ -2,6 +2,7 @@
 
 (function (wHandle, wjQuery) {
 	var SKIN_URL = "./skins/";
+	var GAMEPLAY_TEXT_FONT_STACK = '"Ubuntu", "Outfit", Arial, Helvetica, sans-serif';
 
 	var touchX, touchY, touchable = false, touches = [];
 	var pointerInitialized = false;
@@ -14,10 +15,12 @@
 
 	var lastFeedTime = 0;
 	var lastSplitTime = 0;
-	var minFeedDelay = 50;
+	var minFeedDelay = 90;
 	var minSplitDelay = 50;
 	var lastFeedSoundTime = 0;
-	var minFeedSoundDelay = 70;
+	var minFeedSoundDelay = 180;
+	var lastPelletSoundTime = 0;
+	var minPelletSoundDelay = 95;
 	var lastMaxSplitTime = 0;
 	var minMaxSplitDelay = 120;
 	var feedHoldInterval = null;
@@ -28,12 +31,39 @@
 	var splitTouchID = -1;
 	var feedHoldStartDelay = 220;
 	var splitHoldStartDelay = 280;
+	var canvasPixelRatio = 1;
+	var maxCanvasPixelRatio = 2;
+	var stableViewportSize = null;
+	var viewportResizeTimer = null;
+	var viewportListenersInstalled = false;
+	var browserGestureLocksInstalled = false;
+	var lastTouchEndForZoom = 0;
+	var predictedEjectMassByNode = {};
+	var minClientEjectMass = 35;
+	var predictedEjectMassLoss = 10;
 	var defaultAudioSettings = {
 		playSounds: true,
 		soundsVolume: .45,
 		playMusic: false,
 		musicVolume: .28
 	};
+	var defaultKeyBindings = {
+		split: "Space",
+		eject: "KeyW",
+		maxSplit: "KeyC",
+		freeze: "KeyQ",
+		shield: "KeyE",
+		spike: "KeyR",
+		special: "KeyT"
+	};
+	var keyBindings = {};
+	var joystickSide = "left";
+	var statsStripElement = null;
+	var fpsFrames = 0;
+	var fpsLastUpdate = 0;
+	var currentFps = 0;
+	var lastServerMessageAt = 0;
+	var statsStripLastUpdate = 0;
 
 	function Sound(src, volume, maximum) {
 		this.src = src;
@@ -46,6 +76,7 @@
 		var toPlay;
 		var playPromise;
 		if (typeof volume === "number") this.volume = volume;
+		if (!this.elms.length) this.warm(1);
 		toPlay = null;
 		for (var i = 0; i < this.elms.length; i++) {
 			if (this.elms[i].paused) {
@@ -54,7 +85,9 @@
 			}
 		}
 		if (!toPlay) toPlay = this.add();
-		toPlay.currentTime = 0;
+		try {
+			toPlay.currentTime = 0;
+		} catch (error) {}
 		toPlay.volume = this.volume;
 		playPromise = toPlay.play();
 		if (playPromise && typeof playPromise.catch === "function") playPromise.catch(function() {});
@@ -65,12 +98,21 @@
 		if (this.elms.length >= this.maximum) return this.elms[0];
 		elm = new Audio(this.src);
 		elm.preload = "auto";
+		elm.playsInline = true;
+		try {
+			elm.load();
+		} catch (error) {}
 		this.elms.push(elm);
 		return elm;
 	};
 
-	var pelletSound = new Sound("sound/pellet.mp3", defaultAudioSettings.soundsVolume, 10);
-	var eatSound = new Sound("sound/eat.mp3", defaultAudioSettings.soundsVolume, 10);
+	Sound.prototype.warm = function(count) {
+		var target = Math.min(this.maximum, Math.max(1, count || this.maximum));
+		while (this.elms.length < target) this.add();
+	};
+
+	var pelletSound = new Sound("sound/pellet.mp3", defaultAudioSettings.soundsVolume, 4);
+	var eatSound = new Sound("sound/eat.mp3", defaultAudioSettings.soundsVolume, 4);
 	var backgroundMusic = null;
 	var audioUnlocked = false;
 	var feedSoundVolumeFactor = .22;
@@ -114,6 +156,8 @@
 		settings.playMusic = !!playMusic;
 		settings.musicVolume = musicVolume;
 		settings.jellyPhysics = !!jellyPhysics;
+		settings.keyBindings = normalizeKeyBindings(keyBindings);
+		settings.joystickSide = normalizeJoystickSide(joystickSide);
 		wHandle.localStorage.settings = JSON.stringify(settings);
 	}
 
@@ -180,6 +224,8 @@
 		playMusic = parseToggle(storedSettings.playMusic, playMusic);
 		musicVolume = clampVolume(storedSettings.musicVolume, musicVolume);
 		jellyPhysics = parseToggle(storedSettings.jellyPhysics, jellyPhysics);
+		keyBindings = normalizeKeyBindings(storedSettings.keyBindings);
+		joystickSide = normalizeJoystickSide(storedSettings.joystickSide);
 		updateAudioControls();
 	}
 
@@ -201,8 +247,8 @@
 		if (!audioUnlocked) {
 			audioUnlocked = true;
 			try {
-				pelletSound.add();
-				eatSound.add();
+				pelletSound.warm(4);
+				eatSound.warm(3);
 			} catch (error) {}
 		}
 		syncMusicPlayback();
@@ -210,17 +256,74 @@
 
 	function playConsumeSound(killedNode) {
 		var isPelletLike;
+		var currentTime;
+		var mobileSoundDelay;
 		if (!audioUnlocked || !playSounds || !killedNode) return;
 		isPelletLike = !killedNode.isVirus && killedNode.size <= 20;
-		(isPelletLike ? pelletSound : eatSound).play(soundsVolume);
+		if (isPelletLike) {
+			currentTime = Date.now();
+			mobileSoundDelay = isCoarsePointer() ? 260 : minPelletSoundDelay;
+			if (currentTime - lastPelletSoundTime < mobileSoundDelay) return;
+			lastPelletSoundTime = currentTime;
+			pelletSound.play(isCoarsePointer() ? Math.max(.04, soundsVolume * .48) : soundsVolume);
+			return;
+		}
+		eatSound.play(soundsVolume);
 	}
 
 	function playFeedSound() {
 		var currentTime = Date.now();
+		var feedSoundDelay = isCoarsePointer() ? 240 : minFeedSoundDelay;
 		if (!audioUnlocked || !playSounds) return;
-		if (currentTime - lastFeedSoundTime < minFeedSoundDelay) return;
+		if (isCoarsePointer() && currentFps && currentFps < 45) return;
+		if (currentTime - lastFeedSoundTime < feedSoundDelay) return;
 		lastFeedSoundTime = currentTime;
 		eatSound.play(Math.max(.05, soundsVolume * feedSoundVolumeFactor));
+	}
+
+	function cellMassFromSize(cell) {
+		if (!cell || typeof cell.size !== "number") return 0;
+		return cell.size * cell.size / 100;
+	}
+
+	function getPredictedEjectMass(cell) {
+		var mass;
+		if (!cell) return 0;
+		mass = predictedEjectMassByNode[cell.id];
+		if (typeof mass !== "number" || !isFinite(mass)) {
+			mass = cellMassFromSize(cell);
+			predictedEjectMassByNode[cell.id] = mass;
+		}
+		return mass;
+	}
+
+	function getEjectablePlayerCells() {
+		var eligibleCells = [];
+		for (var i = 0; i < playerCells.length; i++) {
+			var cell = playerCells[i];
+			if (!cell || cell.destroyed) continue;
+			if (getPredictedEjectMass(cell) >= minClientEjectMass) eligibleCells.push(cell);
+		}
+		return eligibleCells;
+	}
+
+	function markPredictedEject(eligibleCells) {
+		for (var i = 0; i < eligibleCells.length; i++) {
+			var cell = eligibleCells[i];
+			predictedEjectMassByNode[cell.id] = Math.max(0, getPredictedEjectMass(cell) - predictedEjectMassLoss);
+		}
+	}
+
+	function trackPlayerKill(killedNode) {
+		var name;
+		var currentTime;
+		if (!killedNode || killedNode.isVirus || killedNode.size <= 22) return;
+		name = String(killedNode.name || "").trim();
+		if (!name) return;
+		currentTime = Date.now();
+		if (lastKillCreditByName[name] && currentTime - lastKillCreditByName[name] < 2500) return;
+		lastKillCreditByName[name] = currentTime;
+		playerKillCount++;
 	}
 
 	function resetPointerState() {
@@ -235,6 +338,204 @@
 		pointerInitialized = false;
 	}
 
+	function clampNumber(value, min, max) {
+		return Math.max(min, Math.min(max, value));
+	}
+
+	function normalizeKeyBindings(bindings) {
+		var normalized = {};
+		bindings = bindings || {};
+		Object.keys(defaultKeyBindings).forEach(function(action) {
+			normalized[action] = typeof bindings[action] === "string" && bindings[action] ? bindings[action] : defaultKeyBindings[action];
+		});
+		return normalized;
+	}
+
+	function keyLabel(code) {
+		if (code === "Space") return "SPACE";
+		if (!code) return "";
+		return code.replace(/^Key/, "").replace(/^Digit/, "").replace(/([A-Z])/g, " $1").trim().toUpperCase();
+	}
+
+	function keyActionForEvent(event) {
+		var code = event.code || "";
+		var action;
+		for (action in keyBindings) {
+			if (Object.prototype.hasOwnProperty.call(keyBindings, action) && keyBindings[action] === code) return action;
+		}
+		return null;
+	}
+
+	function normalizeJoystickSide(value) {
+		return value === "right" ? "right" : "left";
+	}
+
+	function isTouchOnJoystickSide(clientX) {
+		return joystickSide === "right" ? clientX > canvasWidth / 2 : clientX < canvasWidth / 2;
+	}
+
+	function stopTouchMovement() {
+		leftVector.reset(0, 0);
+		rawMouseX = canvasWidth / 2;
+		rawMouseY = canvasHeight / 2;
+		pointerInitialized = true;
+		mouseCoordinateChange();
+		oldX = oldY = NaN;
+		sendMouseMove(nodeX, nodeY);
+		resetPointerState();
+	}
+
+	function getCanvasPixelRatio() {
+		return clampNumber(wHandle.devicePixelRatio || 1, 1, maxCanvasPixelRatio);
+	}
+
+	function getTextRenderScale() {
+		return Math.max(1, Math.ceil(10 * viewZoom * canvasPixelRatio) / 10);
+	}
+
+	function isCoarsePointer() {
+		return !!(wHandle.matchMedia && wHandle.matchMedia("(pointer: coarse)").matches);
+	}
+
+	function isViewportLockActive() {
+		return touchable || isCoarsePointer() || !!(navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+	}
+
+	function getRawViewportSize() {
+		var width = Math.max(1, Math.round(wHandle.innerWidth || document.documentElement.clientWidth || 800));
+		var height = Math.max(1, Math.round(wHandle.innerHeight || document.documentElement.clientHeight || 600));
+		return {
+			width: width,
+			height: height,
+			orientation: width >= height ? "landscape" : "portrait"
+		};
+	}
+
+	function shouldRefreshStableViewport(rawSize) {
+		var widthDelta;
+		var heightDelta;
+		if (!stableViewportSize) return true;
+		if (stableViewportSize.orientation !== rawSize.orientation) return true;
+		widthDelta = Math.abs(rawSize.width - stableViewportSize.width);
+		heightDelta = Math.abs(rawSize.height - stableViewportSize.height);
+		if (widthDelta >= 64) return true;
+		return heightDelta >= Math.max(160, Math.round(stableViewportSize.height * .35));
+	}
+
+	function getGameViewportSize() {
+		var rawSize = getRawViewportSize();
+		if (!isViewportLockActive()) {
+			stableViewportSize = rawSize;
+			return rawSize;
+		}
+		if (shouldRefreshStableViewport(rawSize)) stableViewportSize = rawSize;
+		return stableViewportSize;
+	}
+
+	function applyGameViewportSize(size) {
+		var root = document.documentElement;
+		if (root && root.style) {
+			root.style.setProperty("--blobz-game-width", size.width + "px");
+			root.style.setProperty("--blobz-game-height", size.height + "px");
+		}
+		if (!document.body || !document.body.style) return;
+		if (isViewportLockActive()) {
+			document.body.style.width = size.width + "px";
+			document.body.style.height = size.height + "px";
+		} else {
+			document.body.style.width = "";
+			document.body.style.height = "";
+		}
+	}
+
+	function scheduleCanvasResize(forceUnlock) {
+		if (forceUnlock) stableViewportSize = null;
+		if (viewportResizeTimer) clearTimeout(viewportResizeTimer);
+		viewportResizeTimer = setTimeout(function() {
+			viewportResizeTimer = null;
+			canvasResize();
+		}, forceUnlock ? 60 : 120);
+	}
+
+	function preventBrowserGesture(event) {
+		if (event && event.preventDefault) event.preventDefault();
+		return false;
+	}
+
+	function preventMultiTouchZoom(event) {
+		if (event && event.touches && event.touches.length > 1) preventBrowserGesture(event);
+	}
+
+	function preventDoubleTapZoom(event) {
+		var currentTime = Date.now();
+		if (currentTime - lastTouchEndForZoom < 320) preventBrowserGesture(event);
+		lastTouchEndForZoom = currentTime;
+	}
+
+	function installBrowserGestureLocks() {
+		var options = { passive: false };
+		if (browserGestureLocksInstalled) return;
+		browserGestureLocksInstalled = true;
+		document.addEventListener("gesturestart", preventBrowserGesture, options);
+		document.addEventListener("gesturechange", preventBrowserGesture, options);
+		document.addEventListener("gestureend", preventBrowserGesture, options);
+		document.addEventListener("touchstart", preventMultiTouchZoom, options);
+		document.addEventListener("touchmove", preventMultiTouchZoom, options);
+		document.addEventListener("touchend", preventDoubleTapZoom, options);
+		document.addEventListener("dblclick", preventBrowserGesture, options);
+	}
+
+	function installViewportListeners() {
+		if (viewportListenersInstalled) return;
+		viewportListenersInstalled = true;
+		wHandle.addEventListener("orientationchange", function() {
+			stableViewportSize = null;
+			scheduleCanvasResize(true);
+			setTimeout(function() {
+				stableViewportSize = null;
+				canvasResize();
+			}, 360);
+		}, false);
+		if (wHandle.visualViewport) {
+			wHandle.visualViewport.addEventListener("resize", function() {
+				scheduleCanvasResize(false);
+			}, { passive: true });
+			wHandle.visualViewport.addEventListener("scroll", function() {
+				scheduleCanvasResize(false);
+			}, { passive: true });
+		}
+	}
+
+	function shouldShowTouchControls() {
+		return touchable || isCoarsePointer();
+	}
+
+	function getTouchButtonLayout() {
+		var shortSide = Math.min(canvasWidth, canvasHeight);
+		var splitSize = clampNumber(Math.round(shortSide * .18), 66, 86);
+		var feedSize = clampNumber(Math.round(splitSize * .72), 48, 62);
+		var gap = Math.max(8, Math.round(splitSize * .14));
+		var margin = Math.max(24, Math.round(shortSide * .075));
+		var buttonsOnLeft = joystickSide === "right";
+		var splitX = buttonsOnLeft ? margin : canvasWidth - splitSize - margin;
+		var splitY = canvasHeight - splitSize - margin;
+		var feedX = buttonsOnLeft ? splitX + splitSize + gap : splitX - feedSize - gap;
+		var feedY = splitY + Math.round((splitSize - feedSize) / 2);
+		return {
+			size: splitSize,
+			split: { x: splitX, y: splitY, size: splitSize },
+			feed: { x: Math.max(margin, Math.min(canvasWidth - feedSize - margin, feedX)), y: feedY, size: feedSize }
+		};
+	}
+
+	function isTouchInsideButton(touch, button) {
+		return touch.clientX >= button.x && touch.clientX <= button.x + button.size && touch.clientY >= button.y && touch.clientY <= button.y + button.size;
+	}
+
+	function getJoystickRadius() {
+		return clampNumber(Math.round(Math.min(canvasWidth, canvasHeight) * .15), 42, 62);
+	}
+
 	function triggerMaxSplit() {
 		var currentTime = Date.now();
 		if (currentTime - lastMaxSplitTime < minMaxSplitDelay) return false;
@@ -246,10 +547,18 @@
 
 	function triggerFeed() {
 		var currentTime = Date.now();
+		var eligibleCells;
+		if (!wsIsOpen()) return false;
 		if (currentTime - lastFeedTime < minFeedDelay) return false;
+		eligibleCells = getEjectablePlayerCells();
+		if (!eligibleCells.length) {
+			lastFeedTime = currentTime;
+			return false;
+		}
 		sendMouseMove();
-		sendUint8(21);
+		if (!sendUint8(21)) return false;
 		lastFeedTime = currentTime;
+		markPredictedEject(eligibleCells);
 		playFeedSound();
 		return true;
 	}
@@ -313,6 +622,8 @@
 		ctx = mainCanvas.getContext("2d");
 		loadAudioSettings();
 		updateMacroControls();
+		installBrowserGestureLocks();
+		installViewportListeners();
 		document.addEventListener("visibilitychange", syncMusicPlayback);
 
 		mainCanvas.onmousemove = function (event) {
@@ -329,6 +640,7 @@
 		mainCanvas.addEventListener('touchstart', onTouchStart, false);
 		mainCanvas.addEventListener('touchmove', onTouchMove, false);
 		mainCanvas.addEventListener('touchend', onTouchEnd, false);
+		mainCanvas.addEventListener('touchcancel', onTouchEnd, false);
 
 		if (/firefox/i.test(navigator.userAgent)) {
 			document.addEventListener("DOMMouseScroll", handleWheel, false);
@@ -369,8 +681,12 @@
 			leaderboardExitButton.onclick = function(event) {
 				event.preventDefault();
 				event.stopPropagation();
-				closeLeaderboard();
-				showOverlays(true);
+				wHandle.blobzReopenLeaderboardAfterCancel = true;
+				if (wHandle.blobzShell && typeof wHandle.blobzShell.showLeaveConfirm === "function") {
+					wHandle.blobzShell.showLeaveConfirm();
+				} else {
+					showOverlays(true);
+				}
 				wHandle.isSpectating = false;
 				return false;
 			};
@@ -378,62 +694,43 @@
 		renderLeaderboardHud();
 		updateLeaderboardHudVisibility();
 
-		var spacePressed = false, cPressed = false, qPressed = false, ePressed = false, rPressed = false, tPressed = false, wPressed = false;
+		var actionPressed = {};
 
 		wHandle.onkeydown = function (event) {
 			if (typeof event['isTrusted'] !== 'boolean' || event['isTrusted'] === false) return;
 
+			var action = keyActionForEvent(event);
+			if (action && !isTyping) {
+				if (actionPressed[action]) return;
+				if (action === "split") {
+					startSplitHold();
+					actionPressed[action] = true;
+				} else if (action === "maxSplit") {
+					if (triggerMaxSplit()) actionPressed[action] = true;
+				} else if (action === "eject") {
+					startFeedHold();
+					actionPressed[action] = true;
+				} else if (action === "freeze") {
+					sendUint8(18);
+					if (!qMacro) actionPressed[action] = true;
+				} else if (action === "shield") {
+					sendMouseMove();
+					sendUint8(22);
+					if (!eMacro) actionPressed[action] = true;
+				} else if (action === "spike") {
+					sendMouseMove();
+					sendUint8(23);
+					if (!rMacro) actionPressed[action] = true;
+				} else if (action === "special") {
+					sendMouseMove();
+					sendUint8(24);
+					actionPressed[action] = true;
+				}
+				event.preventDefault();
+				return;
+			}
+
 			switch (event.keyCode) {
-				case 32: // split
-					if ((!spacePressed) && (!isTyping)) {
-						startSplitHold();
-						spacePressed = true;
-					}
-					break;
-				case 67: // max split x16
-					if ((!cPressed) && (!isTyping)) {
-						if (triggerMaxSplit()) {
-							cPressed = true;
-						}
-					}
-					break;
-				case 81: // key q pressed
-					if ((!qPressed) && (!isTyping)) {
-						sendUint8(18);
-						if (!qMacro) qPressed = true;
-						//console.log("Q pressed")
-					}
-					break;
-				case 87: // eject mass
-					if ((!wPressed) && (!isTyping)) {
-						startFeedHold();
-						wPressed = true;
-					}
-					break;
-				case 69: // e key
-					if (!ePressed && (!isTyping)) {
-						sendMouseMove();
-						sendUint8(22);
-						if (!eMacro) ePressed = true;
-						//console.log("E pressed")
-					}
-					break;
-				case 82: // r key
-					if (!rPressed && (!isTyping)) {
-						sendMouseMove();
-						sendUint8(23);
-						if (!rMacro) rPressed = true;
-						//console.log("R pressed")
-					}
-					break;
-				case 84: // T key
-					if (!rPressed && (!isTyping)) {
-						sendMouseMove();
-						sendUint8(24);
-						tPressed = true;
-						//console.log("T pressed")
-					}
-					break;
 				case 27: // quit
 					if (leaderboardOpen) {
 						closeLeaderboard();
@@ -464,42 +761,23 @@
 		wHandle.onkeyup = function (event) {
 			if (typeof event['isTrusted'] !== 'boolean' || event['isTrusted'] === false) return;
 
-			switch (event.keyCode) {
-				case 32:
-					stopSplitHold();
-					spacePressed = false;
-					break;
-				case 67:
-					cPressed = false;
-					break;
-				case 87:
-					stopFeedHold();
-					wPressed = false;
-					break;
-				case 69:
-					ePressed = false;
-					break;
-				case 82:
-					rPressed = false;
-					break;
-				case 84:
-					tPressed = false;
-					break;
-				case 81:
-					if (qPressed) {
-						sendUint8(19);
-						qPressed = false;
-					}
-					break;
-			}
+			var action = keyActionForEvent(event);
+			if (!action) return;
+			if (action === "split") stopSplitHold();
+			if (action === "eject") stopFeedHold();
+			if (action === "freeze" && actionPressed[action]) sendUint8(19);
+			actionPressed[action] = false;
+			event.preventDefault();
 		};
 		wHandle.onblur = function (event) {
 			sendUint8(19);
 			stopFeedHold();
 			stopSplitHold();
-			wPressed = qPressed = spacePressed = cPressed = false
+			actionPressed = {};
 		};
-		wHandle.onresize = canvasResize;
+		wHandle.onresize = function() {
+			scheduleCanvasResize(false);
+		};
 		canvasResize();
 		resetPointerState();
 		if (wHandle.requestAnimationFrame) {
@@ -541,43 +819,35 @@
 
 	function onTouchStart(e) {
 		if (typeof e['isTrusted'] !== 'boolean' || e['isTrusted'] === false) return;
+		e.preventDefault();
 		touchable = true;
 		lastTouchInputTime = Date.now();
 
+		var buttons = getTouchButtonLayout();
 		for (var i = 0; i < e.changedTouches.length; i++) {
 			var touch = e.changedTouches[i];
 
-			if ((leftTouchID < 0) && (touch.clientX < canvasWidth / 2)) {
+			if (isTouchInsideButton(touch, buttons.split)) {
+				startSplitHold();
+				splitTouchID = touch.identifier;
+				continue;
+			}
+
+			if (isTouchInsideButton(touch, buttons.feed)) {
+				startFeedHold();
+				feedTouchID = touch.identifier;
+				continue;
+			}
+
+			if ((leftTouchID < 0) && isTouchOnJoystickSide(touch.clientX)) {
 				leftTouchID = touch.identifier;
 				leftTouchStartPos.reset(touch.clientX, touch.clientY);
 				leftTouchPos.copyFrom(leftTouchStartPos);
 				leftVector.reset(0, 0);
-			}
-
-			var size = ~~(canvasWidth / 10);
-
-			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - size)) {
-				startSplitHold();
-				splitTouchID = touch.identifier;
-			}
-
-			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - 2 * size - 10) && (touch.clientY < canvasHeight - size - 10)) {
-				startFeedHold();
-				feedTouchID = touch.identifier;
-			}
-
-			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - 3 * size - 20) && (touch.clientY < canvasHeight - 2 * size - 30)) {
-				sendMouseMove();
-
-				if (!document.fullscreenElement) {
-					openFullscreen(document.documentElement);
-				} else {
-					closeFullscreen();
-				}
-			}
-
-			if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - 4 * size - 30) && (touch.clientY < canvasHeight - 3 * size - 30)) {
-				triggerMaxSplit();
+				rawMouseX = canvasWidth / 2;
+				rawMouseY = canvasHeight / 2;
+				pointerInitialized = true;
+				mouseCoordinateChange();
 			}
 		}
 		touches = e.touches;
@@ -595,11 +865,21 @@
 		for (var i = 0; i < e.changedTouches.length; i++) {
 			var touch = e.changedTouches[i];
 			if (leftTouchID === touch.identifier) {
+				var radius = getJoystickRadius();
+				var length;
+				var scale;
 				leftTouchPos.reset(touch.clientX, touch.clientY);
 				leftVector.copyFrom(leftTouchPos);
 				leftVector.minusEq(leftTouchStartPos);
-				rawMouseX = leftVector.x * 3 + canvasWidth / 2;
-				rawMouseY = leftVector.y * 3 + canvasHeight / 2;
+				length = Math.sqrt(leftVector.x * leftVector.x + leftVector.y * leftVector.y);
+				if (length > radius) {
+					scale = radius / length;
+					leftVector.x *= scale;
+					leftVector.y *= scale;
+					leftTouchPos.reset(leftTouchStartPos.x + leftVector.x, leftTouchStartPos.y + leftVector.y);
+				}
+				rawMouseX = leftVector.x * 4.4 + canvasWidth / 2;
+				rawMouseY = leftVector.y * 4.4 + canvasHeight / 2;
 				pointerInitialized = true;
 				mouseCoordinateChange();
 				sendMouseMove();
@@ -624,8 +904,7 @@
 			}
 			if (leftTouchID === touch.identifier) {
 				leftTouchID = -1;
-				leftVector.reset(0, 0);
-				resetPointerState();
+				stopTouchMovement();
 			}
 		}
 		if (!e.touches.length) {
@@ -720,6 +999,19 @@
 		updateLeaderboardHudVisibility();
 	}
 
+	function handlePlayerEliminated() {
+		if (eliminationHandled) return;
+		eliminationHandled = true;
+		resetPointerState();
+		if (wHandle.blobzShell && typeof wHandle.blobzShell.showResultScreen === "function") {
+			setTimeout(function() {
+				wHandle.blobzShell.showResultScreen();
+			}, 0);
+			return;
+		}
+		showOverlays(false);
+	}
+
 	function Ha() {
 		wjQuery("#region").val() ? wHandle.localStorage.location = wjQuery("#region").val() : wHandle.localStorage.location && wjQuery("#region").val(wHandle.localStorage.location);
 		wjQuery("#region").val() ? wjQuery("#locationKnown").append(wjQuery("#region")) : wjQuery("#locationUnknown").append(wjQuery("#region"))
@@ -760,10 +1052,15 @@
 		nodes = {};
 		nodelist = [];
 		Cells = [];
+		predictedEjectMassByNode = {};
 		leaderBoard = [];
 		leaderBoardSelf = null;
 		mainCanvas = teamScores = null;
 		userScore = 0;
+		playerKillCount = 0;
+		lastKillCreditByName = {};
+		lastServerMessageAt = 0;
+		eliminationHandled = false;
 		closeLeaderboard();
 		renderLeaderboardHud();
 		resetPointerState();
@@ -819,6 +1116,7 @@
 	}
 
 	function onWsMessage(msg) {
+		lastServerMessageAt = Date.now();
 		handleWsMessage(new DataView(msg.data))
 	}
 
@@ -1158,6 +1456,7 @@
 			if (killer && killedNode) {
 				if (-1 != playerCells.indexOf(killer) && -1 == playerCells.indexOf(killedNode)) {
 					playConsumeSound(killedNode);
+					trackPlayerKill(killedNode);
 				}
 				killedNode.destroy();
 				killedNode.ox = killedNode.x;
@@ -1223,6 +1522,7 @@
 			node.nx = posX;
 			node.ny = posY;
 			node.nSize = size;
+			predictedEjectMassByNode[nodeid] = size * size / 100;
 			node.updateCode = code;
 			node.updateTime = timestamp;
 			node.flag = flags;
@@ -1246,7 +1546,7 @@
 			node = nodes[nodeId];
 			null != node && node.destroy();
 		}
-		ua && 0 == playerCells.length && showOverlays(false)
+		ua && 0 == playerCells.length && handlePlayerEliminated()
 	}
 
 	function sendMouseMove(targetX, targetY) {
@@ -1301,8 +1601,10 @@
 		if (wsIsOpen()) {
 			var msg = prepareData(1);
 			msg.setUint8(0, a);
-			wsSend(msg)
+			wsSend(msg);
+			return true;
 		}
+		return false;
 	}
 
 	function redrawGameScene() {
@@ -1311,11 +1613,20 @@
 	}
 
 	function canvasResize() {
+		var viewportSize;
 		window.scrollTo(0, 0);
-		canvasWidth = wHandle.innerWidth;
-		canvasHeight = wHandle.innerHeight;
-		nCanvas.width = canvasWidth;
-		nCanvas.height = canvasHeight;
+		viewportSize = getGameViewportSize();
+		canvasWidth = viewportSize.width;
+		canvasHeight = viewportSize.height;
+		applyGameViewportSize(viewportSize);
+		canvasPixelRatio = getCanvasPixelRatio();
+		nCanvas.style.width = canvasWidth + "px";
+		nCanvas.style.height = canvasHeight + "px";
+		nCanvas.width = Math.round(canvasWidth * canvasPixelRatio);
+		nCanvas.height = Math.round(canvasHeight * canvasPixelRatio);
+		ctx.setTransform(canvasPixelRatio, 0, 0, canvasPixelRatio, 0, 0);
+		ctx.imageSmoothingEnabled = true;
+		if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = "high";
 
 		var hello = wjQuery("#helloDialog");
 		hello.css("transform", "none");
@@ -1340,16 +1651,32 @@
 
 	function drawGameScene() {
 		var a, oldtime = Date.now();
+		ctx.setTransform(canvasPixelRatio, 0, 0, canvasPixelRatio, 0, 0);
+		ctx.imageSmoothingEnabled = true;
+		if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = "high";
 		++cb;
 		timestamp = oldtime;
+		fpsFrames++;
+		if (!fpsLastUpdate) fpsLastUpdate = oldtime;
+		if (oldtime - fpsLastUpdate >= 500) {
+			currentFps = Math.round(fpsFrames * 1000 / Math.max(1, oldtime - fpsLastUpdate));
+			fpsFrames = 0;
+			fpsLastUpdate = oldtime;
+		}
 		if (0 < playerCells.length) {
 			calcViewZoom();
-			var c = a = 0;
+			var c = a = 0, playerMass = 0;
 			for (var d = 0; d < playerCells.length; d++) {
 				playerCells[d].updatePos();
 				a += playerCells[d].x / playerCells.length;
 				c += playerCells[d].y / playerCells.length;
+				playerMass += playerCells[d].size * playerCells[d].size / 100;
 			}
+			if (!runStartedAt) runStartedAt = Date.now();
+			lastPlayerMass = Math.max(0, Math.floor(playerMass));
+			bestPlayerMass = Math.max(bestPlayerMass, lastPlayerMass);
+			userScore = lastPlayerMass;
+			lastAliveAt = Date.now();
 			posX = a;
 			posY = c;
 			posSize = viewZoom;
@@ -1404,6 +1731,7 @@
 		}
 		drawTouchButtons(ctx);
 		drawTouch(ctx);
+		updateStatsStrip(false);
 		//drawChatBoard();
 		var deltatime = Date.now() - oldtime;
 		deltatime > 1E3 / 60 ? z -= .01 : deltatime < 1E3 / 65 && (z += .01);
@@ -1414,42 +1742,26 @@
 	function drawTouch(ctx) {
 		ctx.save();
 
-		if (touchable) {
-			for (var i = 0; i < touches.length; i++) {
+		if (touchable && leftTouchID >= 0) {
+			var radius = getJoystickRadius();
+			ctx.globalAlpha = .88;
+			ctx.fillStyle = "rgba(0, 0, 0, 0.26)";
+			ctx.strokeStyle = "rgba(0, 229, 255, 0.52)";
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.arc(leftTouchStartPos.x, leftTouchStartPos.y, radius, 0, Math.PI * 2, true);
+			ctx.fill();
+			ctx.stroke();
 
-				var touch = touches[i];
-
-				if (touch.identifier === leftTouchID) {
-					ctx.beginPath();
-					ctx.strokeStyle = "#0096ff";
-					ctx.lineWidth = 6;
-					ctx.arc(leftTouchStartPos.x, leftTouchStartPos.y, 40, 0, Math.PI * 2, true);
-					ctx.stroke();
-					ctx.beginPath();
-					ctx.strokeStyle = "#0096ff";
-					ctx.lineWidth = 2;
-					ctx.arc(leftTouchStartPos.x, leftTouchStartPos.y, 60, 0, Math.PI * 2, true);
-					ctx.stroke();
-					ctx.beginPath();
-					ctx.strokeStyle = "#0096ff";
-					ctx.arc(leftTouchPos.x, leftTouchPos.y, 40, 0, Math.PI * 2, true);
-					ctx.stroke();
-				} else {
-					//ctx.beginPath();
-					//ctx.fillStyle = "#0096ff";
-					//ctx.fillText("touch id : "+touch.identifier+" x:"+touch.clientX+" y:"+touch.clientY, touch.clientX+30, touch.clientY-30);
-					ctx.beginPath();
-					ctx.strokeStyle = "#0096ff";
-					ctx.lineWidth = "6";
-					ctx.arc(touch.clientX, touch.clientY, 40, 0, Math.PI * 2, true);
-					ctx.stroke();
-				}
-			}
-		} else {
-			//ctx.fillStyle	 = "white";
-			//ctx.fillText("mouse : "+touchX+", "+touchY, touchX, touchY);
+			ctx.globalAlpha = .95;
+			ctx.fillStyle = "rgba(0, 229, 255, 0.18)";
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.64)";
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.arc(leftTouchPos.x, leftTouchPos.y, radius * .42, 0, Math.PI * 2, true);
+			ctx.fill();
+			ctx.stroke();
 		}
-		//c.fillText("hello", 0,0);
 		ctx.restore();
 	}
 
@@ -1467,10 +1779,10 @@
 
 	function drawGrid() {
 		var arena = getArenaMetrics();
-		var ringCount = showBackgroundSectors ? 11 : 9;
-		var spokeCount = showBackgroundSectors ? 12 : 10;
+		var ringCount = showBackgroundSectors ? 18 : 15;
+		var spokeCount = showBackgroundSectors ? 18 : 16;
 		var ringStep = arena.radius / ringCount;
-		var hubRadius = ringStep * .54;
+		var hubRadius = arena.radius * .06;
 
 		ctx.fillStyle = "#000000";
 		ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -1484,8 +1796,8 @@
 			ctx.clip();
 
 			if (!hideGrid) {
-				ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
-				ctx.lineWidth = 2;
+				ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+				ctx.lineWidth = 1.5;
 				for (var ring = 1; ring <= ringCount; ring++) {
 					ctx.beginPath();
 					ctx.arc(arena.centerX, arena.centerY, ringStep * ring, 0, Math.PI * 2, false);
@@ -1563,40 +1875,45 @@
 	}
 
 	function drawTouchButtons(ctx) {
-		if (touchable && splitIcon.width) {
-			var size = ~~(canvasWidth / 10);
-			ctx.drawImage(splitIcon, canvasWidth - size, canvasHeight - size, size, size);
+		if (!shouldShowTouchControls()) return;
+		var layout = getTouchButtonLayout();
+		drawTouchActionButton(ctx, layout.feed, ejectIcon, "EJECT");
+		drawTouchActionButton(ctx, layout.split, splitIcon, "SPLIT");
+	}
+
+	function drawTouchActionButton(ctx, button, icon, label) {
+		var size = button.size;
+		var centerX = button.x + size / 2;
+		var centerY = button.y + size / 2;
+		ctx.save();
+		ctx.globalAlpha = .9;
+		ctx.fillStyle = "rgba(6, 8, 12, 0.72)";
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+		ctx.lineWidth = Math.max(2, ~~(size * 0.035));
+		ctx.beginPath();
+		ctx.arc(centerX, centerY, size / 2, 0, Math.PI * 2, false);
+		ctx.fill();
+		ctx.stroke();
+
+		ctx.strokeStyle = label === "SPLIT" ? "rgba(0, 229, 255, 0.55)" : "rgba(255, 170, 0, 0.52)";
+		ctx.lineWidth = Math.max(2, ~~(size * 0.045));
+		ctx.beginPath();
+		ctx.arc(centerX, centerY, size * .42, 0, Math.PI * 2, false);
+		ctx.stroke();
+
+		if (icon && icon.width) {
+			var iconSize = size * .46;
+			ctx.globalAlpha = .92;
+			ctx.drawImage(icon, centerX - iconSize / 2, centerY - iconSize / 2 - size * .06, iconSize, iconSize);
 		}
 
-		if (touchable && splitIcon.width) {
-			var size = ~~(canvasWidth / 10);
-			ctx.drawImage(ejectIcon, canvasWidth - size, canvasHeight - 2 * size - 10, size, size);
-		}
-
-		if (touchable && splitIcon.width) {
-			var size = ~~(canvasWidth / 10);
-			ctx.drawImage(!document.fullscreenElement ? fullscreenIcon : fullscreenOffIcon, canvasWidth - size, canvasHeight - 3 * size - 20, size, size);
-		}
-
-		if (touchable) {
-			var size = ~~(canvasWidth / 10);
-			var buttonX = canvasWidth - size;
-			var buttonY = canvasHeight - 4 * size - 30;
-			ctx.save();
-			ctx.globalAlpha = .84;
-			ctx.fillStyle = "rgba(22, 32, 48, 0.92)";
-			ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
-			ctx.lineWidth = Math.max(2, ~~(size * 0.04));
-			ctx.fillRect(buttonX, buttonY, size, size);
-			ctx.strokeRect(buttonX, buttonY, size, size);
-			ctx.globalAlpha = 1;
-			ctx.fillStyle = "#FFFFFF";
-			ctx.font = "bold " + Math.max(14, ~~(size * 0.26)) + "px Ubuntu";
-			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
-			ctx.fillText("x16", buttonX + size / 2, buttonY + size / 2);
-			ctx.restore();
-		}
+		ctx.globalAlpha = 1;
+		ctx.fillStyle = "#FFFFFF";
+		ctx.font = getGameplayTextFont(Math.max(9, ~~(size * .15)), 900);
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillText(label, centerX, centerY + size * .28);
+		ctx.restore();
 	}
 
 	function trimLeaderboardName(name, maxLength) {
@@ -1611,6 +1928,28 @@
 		if (value >= 1000000) return (value / 1000000).toFixed(value >= 10000000 ? 0 : 1).replace(/\.0$/, "") + "m";
 		if (value >= 1000) return (value / 1000).toFixed(value >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k";
 		return String(value);
+	}
+
+	function formatRunTime(ms) {
+		var seconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+		var minutes = Math.floor(seconds / 60);
+		var rest = seconds % 60;
+		return minutes + ":" + (rest < 10 ? "0" : "") + rest;
+	}
+
+	function updateStatsStrip(force) {
+		var now = Date.now();
+		var ping = lastServerMessageAt ? Math.min(999, Math.max(0, now - lastServerMessageAt)) : 0;
+		if (!force && now - statsStripLastUpdate < 450) return;
+		statsStripLastUpdate = now;
+		if (!statsStripElement) statsStripElement = document.getElementById("game-stats-strip");
+		if (!statsStripElement) return;
+		statsStripElement.innerHTML =
+			'<span>FPS <b>' + currentFps + '</b></span>' +
+			'<span>Ping <b>' + ping + 'ms</b></span>' +
+			'<span>Mass <b>' + formatLeaderboardMass(lastPlayerMass) + '</b></span>' +
+			'<span>Kills <b>' + playerKillCount + '</b></span>' +
+			'<span>Time <b>' + formatRunTime(runStartedAt ? now - runStartedAt : 0) + '</b></span>';
 	}
 
 	function cacheLeaderboardHudElements() {
@@ -1633,14 +1972,18 @@
 		cacheLeaderboardHudElements();
 		if (!leaderboardHud) return;
 		var canDisplay = canDisplayLeaderboardHud();
+		var isOpen;
 		if (!canDisplay) leaderboardOpen = false;
+		isOpen = canDisplay && leaderboardOpen;
 		leaderboardHud.classList.toggle("is-hidden", !canDisplay);
-		leaderboardHud.classList.toggle("is-open", canDisplay && leaderboardOpen);
-		if (leaderboardPanel) leaderboardPanel.classList.toggle("is-open", canDisplay && leaderboardOpen);
+		leaderboardHud.classList.toggle("is-open", isOpen);
+		if (leaderboardPanel) leaderboardPanel.classList.toggle("is-open", isOpen);
 		if (leaderboardToggleButton) {
-			leaderboardToggleButton.classList.toggle("is-active", canDisplay && leaderboardOpen);
-			leaderboardToggleButton.setAttribute("aria-expanded", canDisplay && leaderboardOpen ? "true" : "false");
+			leaderboardToggleButton.classList.toggle("is-active", isOpen);
+			leaderboardToggleButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
 		}
+		if (!statsStripElement) statsStripElement = document.getElementById("game-stats-strip");
+		if (statsStripElement) statsStripElement.classList.toggle("is-covered-by-leaderboard", isOpen);
 	}
 
 	function setLeaderboardOpen(open) {
@@ -1723,6 +2066,10 @@
 		ustrokecolor && (this._strokeColor = ustrokecolor)
 	}
 
+	function getGameplayTextFont(fontsize, weight) {
+		return (weight || 700) + " " + fontsize + "px " + GAMEPLAY_TEXT_FONT_STACK;
+	}
+
 	var localProtocol = wHandle.location.protocol, localProtocolHttps = "https:" == localProtocol;
 
 	var nCanvas, ctx, mainCanvas, chatCanvas, canvasWidth, canvasHeight, qTree = null,
@@ -1770,6 +2117,13 @@
 		hideGrid = false,
 		ua = false,
 		userScore = 0,
+		lastPlayerMass = 0,
+		bestPlayerMass = 0,
+		playerKillCount = 0,
+		lastKillCreditByName = {},
+		lastAliveAt = 0,
+		runStartedAt = 0,
+		eliminationHandled = false,
 		sMacro = true,
 		wMacro = true,
 		qMacro = false,
@@ -1834,11 +2188,29 @@
 		ejectIcon = new Image,
 		noRanking = false,
 		showBackgroundSectors = true,
-			jellyPhysics = true,
+			jellyPhysics = false,
 		playSounds = defaultAudioSettings.playSounds,
 		soundsVolume = defaultAudioSettings.soundsVolume,
 		playMusic = defaultAudioSettings.playMusic,
 		musicVolume = defaultAudioSettings.musicVolume;
+
+	function markCellTextDirty(cell) {
+		if (!cell) return;
+		if (cell.nameCache) cell.nameCache._dirty = true;
+		if (cell.sizeCache) cell.sizeCache._dirty = true;
+	}
+
+	function invalidateGameplayTextCaches() {
+		var i;
+		for (i = 0; i < nodelist.length; i++) markCellTextDirty(nodelist[i]);
+		for (i = 0; i < Cells.length; i++) markCellTextDirty(Cells[i]);
+		for (i = 0; i < playerCells.length; i++) markCellTextDirty(playerCells[i]);
+	}
+
+	if (wHandle.document && wHandle.document.fonts && wHandle.document.fonts.ready) {
+		wHandle.document.fonts.ready.then(invalidateGameplayTextCaches);
+	}
+
 	fullscreenIcon.src = 'img/fullscreen.png';
 	fullscreenOffIcon.src = 'img/fullscreen_off.png';
 	splitIcon.src = 'img/split.png';
@@ -1851,7 +2223,14 @@
 		hideOverlays();
 		userNickName = arg;
 		sendNickName();
-		userScore = 0
+		userScore = 0;
+		lastPlayerMass = 0;
+		bestPlayerMass = 0;
+		playerKillCount = 0;
+		lastKillCreditByName = {};
+		lastAliveAt = Date.now();
+		runStartedAt = 0;
+		eliminationHandled = false
 	};
 	wHandle.setRegion = setRegion;
 	wHandle.setSkins = function (arg) {
@@ -1880,6 +2259,14 @@
 	wHandle.setJellyPhysics = function (arg) {
 		jellyPhysics = !!arg;
 		updateVisualControls();
+		persistAudioSettings();
+	};
+	wHandle.setKeyBindings = function(arg) {
+		keyBindings = normalizeKeyBindings(arg);
+		persistAudioSettings();
+	};
+	wHandle.setJoystickSide = function(arg) {
+		joystickSide = normalizeJoystickSide(arg);
 		persistAudioSettings();
 	};
 	wHandle.setPlaySounds = function(arg) {
@@ -1942,6 +2329,18 @@
 		hasPlayerCells: function() {
 			return playerCells.length > 0;
 		},
+		getPlayerStats: function() {
+			var selfScore = leaderBoardSelf && leaderBoardSelf.score ? leaderBoardSelf.score : 0;
+			var mass = Math.max(lastPlayerMass || 0, userScore || 0, selfScore || 0);
+			return {
+				mass: Math.max(0, Math.floor(mass)),
+				bestMass: Math.max(0, Math.floor(Math.max(bestPlayerMass || 0, mass || 0))),
+				rank: leaderBoardSelf && leaderBoardSelf.rank ? leaderBoardSelf.rank : null,
+				name: leaderBoardSelf && leaderBoardSelf.name ? leaderBoardSelf.name : (userNickName || ""),
+				kills: Math.max(0, Math.floor(playerKillCount || 0)),
+				aliveForMs: runStartedAt ? Math.max(0, Date.now() - runStartedAt) : 0
+			};
+		},
 		disconnect: function() {
 			if (!ws) return;
 			ws.onopen = null;
@@ -1954,6 +2353,9 @@
 		},
 		isLeaderboardOpen: function() {
 			return leaderboardOpen;
+		},
+		openLeaderboard: function() {
+			setLeaderboardOpen(true);
 		},
 		closeLeaderboard: closeLeaderboard
 	};
@@ -1990,6 +2392,7 @@
 					break
 				}
 			delete nodes[this.id];
+			delete predictedEjectMassByNode[this.id];
 			tmp = playerCells.indexOf(this);
 			if (-1 != tmp) {
 				ua = true;
@@ -2060,10 +2463,10 @@
 			for (var points = this.points, pointsacc = this.pointsAcc, numpoints = points.length, i = 0; i < numpoints; ++i) {
 				var pos1 = pointsacc[(i - 1 + numpoints) % numpoints],
 					pos2 = pointsacc[(i + 1) % numpoints];
-				pointsacc[i] += (Math.random() - .5) * (this.isAgitated ? 3 : 2);
-				pointsacc[i] *= .7;
-				10 < pointsacc[i] && (pointsacc[i] = 10);
-				-10 > pointsacc[i] && (pointsacc[i] = -10);
+				pointsacc[i] += (Math.random() - .5) * (this.isAgitated ? 2.1 : 1.25);
+				pointsacc[i] *= .62;
+				7 < pointsacc[i] && (pointsacc[i] = 7);
+				-7 > pointsacc[i] && (pointsacc[i] = -7);
 				pointsacc[i] = (pos1 + pos2 + 8 * pointsacc[i]) / 10
 			}
 			for (var ref = this, isvirus = this.isVirus ? 0 : (this.id / 1E3 + timestamp / 1E4) % (2 * Math.PI), j = 0; j < numpoints; ++j) {
@@ -2091,8 +2494,8 @@
 				}
 				f += pointsacc[j];
 				0 > f && (f = 0);
-				f = this.isAgitated ? (19 * f + this.size) / 20 : (12 * f + this.size) / 13;
-				points[j].size = (e + m + 8 * f) / 10;
+				f = this.isAgitated ? (24 * f + this.size) / 25 : (18 * f + this.size) / 19;
+				points[j].size = (e + m + 10 * f) / 12;
 				e = 2 * Math.PI / numpoints;
 				m = this.points[j].size;
 				if (this.isVirus && 0 == j % 2) {
@@ -2287,7 +2690,7 @@
 						ncache = this.nameCache;
 						ncache.setValue(this.name);
 						ncache.setSize(this.getNameSize());
-						var ratio = Math.ceil(10 * viewZoom) / 10;
+						var ratio = getTextRenderScale();
 						ncache.setScale(ratio);
 						var rnchache = ncache.render(),
 							m = rnchache.width / ratio,
@@ -2304,7 +2707,7 @@
 						c = this.sizeCache;
 						c.setSize(this.getNameSize() / 2);
 						c.setValue(~~(this.size * this.size / 100));
-						ratio = Math.ceil(10 * viewZoom) / 10;
+						ratio = getTextRenderScale();
 						c.setScale(ratio);
 						e = c.render();
 						m = e.width / ratio;
@@ -2363,15 +2766,19 @@
 					value = this._value,
 					scale = this._scale,
 					fontsize = this._size,
-					font = fontsize + 'px Ubuntu';
+					font = getGameplayTextFont(fontsize, 700);
 				ctx.font = font;
 				var h = ~~(.2 * fontsize), wd = fontsize * 0.1;
 				var h2 = h * 0.5;
-				canvas.width = ctx.measureText(value).width * scale + 3;
-				canvas.height = (fontsize + h) * scale;
+				canvas.width = Math.ceil(ctx.measureText(value).width * scale + 6 * scale);
+				canvas.height = Math.ceil((fontsize + h) * scale);
 				ctx.font = font;
 				ctx.globalAlpha = 1;
 				ctx.lineWidth = wd;
+				ctx.lineJoin = "round";
+				ctx.miterLimit = 2;
+				ctx.imageSmoothingEnabled = true;
+				if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = "high";
 				ctx.strokeStyle = this._strokeColor;
 				ctx.fillStyle = this._color;
 				ctx.scale(scale, scale);
@@ -2512,8 +2919,8 @@
 		var minimapCenterX = canvasWidth - minimapRadius - minimapPadding;
 		var minimapCenterY = canvasHeight - minimapRadius - minimapPadding;
 		var miniScale = minimapRadius / Math.max(1, arena.radius);
-		var ringCount = 8;
-		var spokeCount = 10;
+		var ringCount = 12;
+		var spokeCount = 14;
 		var hubRadius = minimapRadius * .18;
 
 		ctx.save();

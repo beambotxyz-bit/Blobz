@@ -168,6 +168,11 @@ PlayerCell.prototype.getEatingRange = function() {
 };
 
 PlayerCell.prototype.onConsume = function(consumer, gameServer) {
+  if (consumer && consumer.owner && consumer.owner !== this.owner && consumer.owner.blobzStats) {
+    if (this.owner && this.owner.cells && this.owner.cells.length <= 1) {
+      consumer.owner.blobzStats.kills++;
+    }
+  }
   if (!this.owner.verify && this.owner.gameServer.config.verify == 1) {} else {
     // Add an inefficiency for eating other players' cells
     var factor = (consumer.owner === this.owner ? 1 : gameServer.config.massAbsorbedPercent / 100);
@@ -190,6 +195,9 @@ PlayerCell.prototype.onRemove = function(gameServer) {
   index = this.owner.cells.indexOf(this);
   if (index != -1) {
     this.owner.cells.splice(index, 1);
+  }
+  if (this.owner && this.owner.cells.length === 0 && gameServer && typeof gameServer.finalizeBlobzMatch === 'function') {
+    gameServer.finalizeBlobzMatch(this.owner, 'death');
   }
   // Remove from special player controlled node list
   gameServer.removeNodesPlayer(this);

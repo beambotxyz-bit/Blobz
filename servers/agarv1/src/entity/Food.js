@@ -59,6 +59,9 @@ Food.prototype.onRemove = function (gameServer) {
 };
 
 Food.prototype.onConsume = function (consumer, gameServer) {
+  if (consumer && consumer.owner && consumer.owner.blobzStats) {
+    consumer.owner.blobzStats.foodEaten++;
+  }
   consumer.addMass(this.mass);
 };
 

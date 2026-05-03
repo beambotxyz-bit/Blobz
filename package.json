@@ -12,7 +12,13 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "client:start": "node server/index.js",
+    "api:start": "npm --prefix servers/api start",
+    "api:migrate": "npm --prefix servers/api run migrate",
+    "api:check": "npm --prefix servers/api run check",
+    "prod:check": "node --check server/index.js && node --check ecosystem.config.cjs && npm run api:check",
+    "pm2:start": "pm2 start ecosystem.config.cjs --env production"
   },
   "repository": {
     "type": "git",

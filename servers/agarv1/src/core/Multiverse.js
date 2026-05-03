@@ -147,7 +147,12 @@ module.exports = class Multiverse {
     return false;
   }
   init() {
-    if (this.getLanguage()) this.selected = this.create("Main", true);
+    if (this.getLanguage()) {
+      var worldName = process.env.BLOBZ_WORLD_SLUG || "Main";
+      var worldPort = parseInt(process.env.BLOBZ_WORLD_PORT, 10);
+      if (!isFinite(worldPort)) worldPort = undefined;
+      this.selected = this.create(worldName, true, worldPort);
+    }
   }
   writeTitle() {
     console.log("\u001B[33m                                        _ _       _              _ ");

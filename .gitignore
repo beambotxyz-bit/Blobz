@@ -5,6 +5,11 @@
 /servers/agarv1/node_modules
 /servers/agarv2/node_modules
 /servers/agarv3/node_modules
+/servers/api/node_modules
+/servers/api/.env
+/servers/api/.env.production
+/.env
+/.env.production
 
 # profiling files
 chrome-profiler-events.json

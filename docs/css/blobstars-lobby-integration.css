@@ -3,3 +3,741 @@ button { font: inherit; }
 button.play-btn { border: 2px solid rgba(255,255,255,0.2); }
 .profile-pill .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .modal-content input[type="range"] { accent-color: #00e5ff; }
+
+.modal-tabs,
+.ranking-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 0.35rem;
+    margin-bottom: 1.2rem;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0.35rem;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    background: rgba(5,5,10,0.58);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    scrollbar-width: none;
+}
+
+.modal-tabs::-webkit-scrollbar,
+.ranking-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.modal-tabs .pill-btn,
+.ranking-tabs .pill-btn {
+    min-width: 96px;
+    padding: 0.55rem 1rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 999px !important;
+    color: rgba(255,255,255,0.56) !important;
+    background: transparent !important;
+    background-clip: padding-box;
+    font-size: 0.72rem !important;
+    letter-spacing: 1.6px;
+    box-shadow: none !important;
+}
+
+.modal-tabs .pill-btn:hover,
+.ranking-tabs .pill-btn:hover {
+    color: #fff !important;
+    background: rgba(255,255,255,0.06) !important;
+    transform: translateY(-1px);
+}
+
+.modal-tabs .pill-btn.is-active,
+.ranking-tabs .pill-btn.is-active {
+    border-color: rgba(0,229,255,0.45) !important;
+    color: var(--tab-accent, #00e5ff) !important;
+    background: rgba(0,229,255,0.12) !important;
+    box-shadow: 0 0 14px rgba(0,229,255,0.18), inset 0 0 14px rgba(0,229,255,0.08) !important;
+    border-color: color-mix(in srgb, var(--tab-accent, #00e5ff) 45%, transparent) !important;
+    background: color-mix(in srgb, var(--tab-accent, #00e5ff) 12%, transparent) !important;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--tab-accent, #00e5ff) 18%, transparent), inset 0 0 14px color-mix(in srgb, var(--tab-accent, #00e5ff) 8%, transparent) !important;
+}
+
+.ranking-podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    flex-shrink: 0;
+}
+
+.ranking-podium-slot {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    position: relative;
+}
+
+.ranking-podium-rank {
+    z-index: 10;
+    margin-bottom: 8px;
+    padding: 4px 14px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    font-size: 0.75rem;
+    font-weight: 900;
+}
+
+.ranking-avatar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.8) 100%);
+}
+
+.ranking-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+.ranking-podium-name {
+    max-width: 100%;
+    margin: 0 0 0.5rem;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    font-weight: 900;
+}
+
+.ranking-podium-base {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    border-bottom: none;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.ranking-podium-number {
+    font-size: 2.2rem;
+    font-weight: 900;
+    opacity: 0.34;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+
+.ranking-podium-cups {
+    margin-top: auto;
+    margin-bottom: 8px;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.55rem;
+    font-weight: 900;
+}
+
+.ranking-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+}
+
+.ranking-kicker {
+    color: #00e5ff;
+    font-size: 0.6rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.ranking-title {
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.ranking-status {
+    padding: 6px 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.05);
+    opacity: 0.8;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.ranking-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 2rem;
+}
+
+.ranking-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.6rem 1rem;
+    border-color: rgba(255,255,255,0.03);
+}
+
+.ranking-row.is-current {
+    border-color: rgba(0,229,255,0.28);
+    background: rgba(0,229,255,0.08);
+}
+
+.ranking-rank-chip {
+    padding: 3px 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 900;
+}
+
+.ranking-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ranking-cups {
+    color: rgba(255,255,255,0.55);
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ranking-cups i {
+    margin-right: 4px;
+    color: #ffaa00;
+    font-size: 0.6rem;
+}
+
+@media (max-height: 760px) and (min-width: 1024px) {
+    #modalTitle { font-size: 1.35rem; letter-spacing: 7px; }
+    .modal-tabs,
+    .ranking-tabs { margin-bottom: 0.75rem; }
+    .modal-tabs .pill-btn,
+    .ranking-tabs .pill-btn { min-width: 86px; padding: 0.35rem 0.9rem !important; font-size: 0.66rem !important; }
+    .ranking-podium { margin-bottom: 0.75rem; }
+    .ranking-podium-rank { margin-bottom: 4px; padding: 3px 11px; font-size: 0.65rem; }
+    .ranking-avatar { width: 48px !important; height: 48px !important; }
+    .ranking-podium-name { margin-bottom: 0.3rem; font-size: 0.72rem; }
+    .ranking-podium-base { height: 50px !important; }
+    .ranking-podium-number { font-size: 1.55rem; }
+    .ranking-podium-cups { margin-bottom: 5px; }
+    .ranking-heading { margin-bottom: 0.4rem; }
+    .ranking-title { font-size: 0.9rem; }
+    .ranking-list { gap: 0.36rem; padding-bottom: 0.75rem; }
+    .ranking-row { padding: 0.38rem 0.75rem; }
+    .ranking-row .ranking-avatar { width: 28px !important; height: 28px !important; }
+}
+
+@media (max-width: 1023px) and (orientation: landscape) {
+    #modalTitle { font-size: 1.05rem; letter-spacing: 6px; }
+    #modalContent > div:first-child {
+        gap: 0.35rem !important;
+        margin-bottom: 0.35rem !important;
+    }
+    #modalContent > div:first-child .pill-btn {
+        padding: 0.45rem 0.85rem !important;
+        font-size: 0.62rem !important;
+        letter-spacing: 2px;
+    }
+    #modalContent .grid-4 {
+        gap: 0.45rem !important;
+    }
+    #modalContent .grid-4 > .premium-panel {
+        padding: 0.65rem 0.35rem !important;
+        border-radius: 12px;
+    }
+    #modalContent .grid-4 > .premium-panel > div[style*="width: 100px"] {
+        width: 62px !important;
+        height: 62px !important;
+        margin-bottom: 0.85rem !important;
+    }
+    #modalContent .grid-4 > .premium-panel img {
+        width: 100% !important;
+        height: 100% !important;
+    }
+    #modalContent .grid-4 > .premium-panel h4 {
+        font-size: 0.64rem !important;
+        letter-spacing: 0.5px !important;
+    }
+    #modalContent .grid-4 .id-ribbon {
+        padding: 2px 6px;
+        font-size: 0.55rem;
+    }
+    #modalContent .grid-4 .rarity-tag {
+        bottom: -8px;
+        padding: 2px 7px;
+        font-size: 0.5rem;
+    }
+    .modal-tabs,
+    .ranking-tabs { margin-bottom: 0.45rem; padding: 0.22rem; }
+    .modal-tabs .pill-btn,
+    .ranking-tabs .pill-btn { min-width: 72px; padding: 0.35rem 0.75rem !important; font-size: 0.62rem !important; }
+    .ranking-podium { margin-bottom: 0.45rem; padding: 0 0.25rem; }
+    .ranking-podium-rank { margin-bottom: 3px; padding: 2px 9px; font-size: 0.58rem; }
+    .ranking-avatar { width: 34px !important; height: 34px !important; }
+    .ranking-podium-name { margin-bottom: 0.2rem; font-size: 0.62rem; }
+    .ranking-podium-base { height: 34px !important; }
+    .ranking-podium-number { font-size: 1.15rem; line-height: 1; }
+    .ranking-podium-cups { margin-bottom: 3px; font-size: 0.48rem; }
+    .ranking-heading { margin-bottom: 0.35rem; }
+    .ranking-kicker { font-size: 0.5rem; }
+    .ranking-title { font-size: 0.8rem; }
+    .ranking-status { padding: 4px 9px; font-size: 0.56rem; }
+    .ranking-list { gap: 0.32rem; padding-bottom: 0.5rem; }
+    .ranking-row { padding: 0.35rem 0.6rem; gap: 0.55rem; }
+    .ranking-row .ranking-avatar { width: 28px !important; height: 28px !important; }
+    .ranking-rank-chip { font-size: 0.58rem; padding: 2px 7px; }
+    .ranking-row-name { font-size: 0.68rem; }
+    .ranking-cups { font-size: 0.58rem; }
+}
+
+@media (max-width: 1200px) and (orientation: portrait), (max-width: 768px) and (orientation: portrait) {
+    .modal-tabs,
+    .ranking-tabs { justify-content: flex-start; margin-bottom: 1rem; }
+    .modal-tabs .pill-btn,
+    .ranking-tabs .pill-btn { min-width: 92px; }
+    .ranking-podium { gap: 0.35rem; margin-bottom: 1rem; padding: 0 0.25rem; }
+    .ranking-podium-rank { padding: 3px 9px; font-size: 0.65rem; }
+    .ranking-avatar { width: 48px !important; height: 48px !important; }
+    .ranking-podium-name { font-size: 0.72rem; }
+    .ranking-podium-base { height: 58px !important; }
+    .ranking-podium-number { font-size: 1.7rem; }
+    .ranking-heading { gap: 0.75rem; }
+    .ranking-title { font-size: 0.9rem; }
+    .ranking-status { padding: 5px 10px; }
+    .ranking-row { gap: 0.6rem; padding: 0.55rem 0.75rem; }
+}
+
+.reference-tabs {
+    justify-content: flex-start !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    scrollbar-width: none;
+}
+
+.ranking-tabs.reference-tabs {
+    justify-content: center !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    background: rgba(0,0,0,0.6) !important;
+    padding: 0.5rem !important;
+}
+
+.reference-tabs .pill-btn {
+    min-width: auto !important;
+    border-radius: 8px 8px 0 0 !important;
+    box-shadow: none !important;
+    transform: none;
+}
+
+.ranking-tabs.reference-tabs .pill-btn {
+    border-radius: 4px !important;
+}
+
+.asset-card {
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.asset-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 35px rgba(0,0,0,0.7);
+}
+
+.modal-content input[type="range"] {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.4);
+    box-shadow: inset 0 1px 4px rgba(0,0,0,0.6);
+    cursor: pointer;
+}
+
+.modal-content input[type="range"]::-webkit-slider-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    border: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5), 0 0 10px rgba(255,255,255,0.8);
+    -webkit-appearance: none;
+}
+
+.modal-content input,
+.modal-content button {
+    font-family: 'Outfit', sans-serif;
+}
+
+.skin-square-grid {
+    align-items: stretch;
+}
+
+.skin-square-card {
+    aspect-ratio: 1 / 1;
+    min-height: 0;
+    padding: clamp(0.55rem, 1vw, 0.85rem) !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    cursor: pointer;
+}
+
+.skin-card-shine {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.skin-card-topline {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 40%;
+    height: 2px;
+    transform: translateX(-50%);
+}
+
+.skin-card-id {
+    padding: 3px 9px;
+    font-size: 0.62rem;
+}
+
+.skin-card-stage {
+    width: var(--skin-stage-size, 74px);
+    height: var(--skin-stage-size, 74px);
+    margin: 0.28rem auto 0.18rem;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto;
+}
+
+.skin-card-orbit {
+    position: absolute;
+    bottom: 7px;
+    width: 54%;
+    height: 18%;
+    border: 1px solid;
+    border-radius: 50%;
+    transform: rotateX(75deg);
+}
+
+.skin-card-media {
+    position: relative;
+    width: var(--skin-media-size, 60px);
+    height: var(--skin-media-size, 60px);
+    z-index: 2;
+    flex: 0 0 auto;
+}
+
+.skin-card-media img {
+    width: 100% !important;
+    height: 100% !important;
+    border: 2px solid;
+    border-radius: 50% !important;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    transform: translateY(-4px);
+}
+
+.skin-card-copy {
+    width: 100%;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.skin-card-rarity {
+    display: inline-block;
+    max-width: 100%;
+    margin-bottom: 0.24rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.52rem;
+    font-weight: 900;
+    letter-spacing: 0.9px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.skin-card-title {
+    margin: 0;
+    color: #fff;
+    font-size: clamp(0.68rem, 0.85vw, 0.84rem);
+    font-weight: 900;
+    letter-spacing: 0.8px;
+    line-height: 1.05;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.skin-card-equipped {
+    margin-top: 0.26rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 0.58rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+@media (max-height: 760px) and (min-width: 1024px) {
+    .skin-square-card {
+        padding: 0.48rem !important;
+    }
+
+    .skin-card-stage {
+        --skin-stage-size: 62px;
+        --skin-media-size: 50px;
+        margin-top: 0.18rem;
+    }
+
+    .skin-card-title {
+        font-size: 0.66rem;
+    }
+}
+
+@media (max-width: 1023px) and (orientation: landscape) {
+    .skin-square-card {
+        padding: 0.44rem !important;
+        gap: 0.22rem;
+    }
+
+    .skin-card-stage {
+        --skin-stage-size: 54px;
+        --skin-media-size: 44px;
+        margin: 0.1rem auto 0.05rem;
+    }
+
+    .skin-card-rarity {
+        padding: 1px 6px;
+        font-size: 0.45rem;
+    }
+
+    .skin-card-title {
+        font-size: 0.58rem;
+        letter-spacing: 0.4px;
+    }
+
+    .skin-card-equipped {
+        font-size: 0.48rem;
+    }
+}
+
+@media (max-width: 1200px) and (orientation: portrait), (max-width: 768px) and (orientation: portrait) {
+    .skin-square-card {
+        padding: 0.65rem !important;
+    }
+
+    .skin-card-stage {
+        --skin-stage-size: 70px;
+        --skin-media-size: 56px;
+    }
+
+    .skin-card-title {
+        font-size: 0.7rem;
+    }
+}
+
+.mobile-action-card {
+    width: 100%;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid rgba(0,229,255,0.24);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(0,229,255,0.13), rgba(255,0,127,0.08));
+    color: #fff;
+    box-shadow: inset 0 0 18px rgba(0,229,255,0.08), 0 10px 24px rgba(0,0,0,0.4);
+    cursor: pointer;
+}
+
+.mobile-action-icon,
+.mobile-action-status {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+}
+
+.mobile-action-icon {
+    background: rgba(0,229,255,0.15);
+    color: #00e5ff;
+    box-shadow: 0 0 16px rgba(0,229,255,0.24);
+}
+
+.mobile-action-copy {
+    min-width: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.14rem;
+    text-align: left;
+}
+
+.mobile-action-copy strong {
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+}
+
+.mobile-action-copy small {
+    color: rgba(255,255,255,0.58);
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+}
+
+.mobile-action-status {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.72);
+}
+
+.mobile-action-status.is-ready {
+    background: #00e5ff;
+    color: #001015;
+}
+
+.mobile-action-status.is-claimed {
+    background: #39ff14;
+    color: #001500;
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+    #modalContent > .reference-tabs {
+        margin-bottom: 0.25rem !important;
+        padding-bottom: 2px !important;
+    }
+
+    #modalContent > .reference-tabs .pill-btn {
+        padding: 0.35rem 0.85rem !important;
+        font-size: 0.58rem !important;
+    }
+
+    .skin-square-grid {
+        gap: 0.5rem !important;
+        max-height: none;
+    }
+
+    .skin-square-card {
+        --skin-stage-size: clamp(50px, 12vh, 62px);
+        --skin-media-size: clamp(40px, 9.6vh, 50px);
+        padding: 0.42rem !important;
+        gap: 0.18rem;
+        border-radius: 14px;
+    }
+
+    .skin-card-stage {
+        margin: 0.04rem auto 0;
+    }
+
+    .skin-card-rarity {
+        margin-bottom: 0.18rem;
+        padding: 1px 6px;
+        font-size: 0.46rem;
+    }
+
+    .skin-card-title {
+        font-size: 0.58rem;
+        letter-spacing: 0.45px;
+    }
+
+    .skin-card-equipped {
+        margin-top: 0.16rem;
+        font-size: 0.48rem;
+    }
+
+    .mobile-action-strip {
+        display: block;
+        margin-bottom: 0.45rem;
+    }
+
+    .daily-progress-strip {
+        gap: 0.55rem !important;
+        margin-bottom: 0.55rem !important;
+    }
+
+    .daily-progress-strip div[style*="width:40px"] {
+        width: 34px !important;
+        height: 34px !important;
+    }
+
+    .daily-reward-card {
+        position: relative;
+        padding: 0.85rem 1rem !important;
+        overflow: hidden;
+    }
+
+    .daily-reward-card .bundle-badge {
+        top: 8px !important;
+        right: 8px !important;
+        max-width: calc(100% - 16px);
+        transform: rotate(3deg) scale(0.82) !important;
+        transform-origin: top right;
+        white-space: nowrap;
+    }
+
+    .daily-crate-icon {
+        font-size: 2.5rem !important;
+        margin-bottom: 0.45rem !important;
+    }
+
+    .daily-reward-card .pill-btn {
+        padding: 0.62rem 1rem !important;
+        font-size: 0.78rem !important;
+    }
+}
+
+@media (max-width: 1023px) and (orientation: landscape), (max-width: 1200px) and (orientation: portrait), (max-width: 768px) and (orientation: portrait) {
+    .mobile-action-strip {
+        display: block;
+        margin-bottom: 0.75rem;
+    }
+}

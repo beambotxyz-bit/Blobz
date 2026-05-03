@@ -2,18 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' data: *; media-src 'self' data: *; style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com; font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com data:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' ws: wss:; manifest-src 'self'; frame-src 'self' data:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' data: *; media-src 'self' data: *; style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com; font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com data:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://telegram.org; connect-src 'self' http://127.0.0.1:8787 http://localhost:8787 ws: wss:; manifest-src 'self'; frame-src 'self' data:;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Blobz</title>
 <link rel="shortcut icon" href="/img/blobz-mark.png">
 <link rel="icon" type="image/png" href="/img/blobz-mark.png">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="stylesheet" href="/css/blobstars-lobby.css?v=7">
-<link rel="stylesheet" href="/css/blobstars-lobby-integration.css?v=7">
+    <link rel="stylesheet" href="/css/blobstars-lobby.css?v=15">
+    <link rel="stylesheet" href="/css/blobstars-lobby-integration.css?v=15">
 </head>
 <body class="blobz-lobby-page">
 <div class="bg-layer"></div>
+    <div class="nebula-cloud"></div>
+    <div class="hyperspace" id="hyperspaceBg" aria-hidden="true"></div>
     <div class="nebula-glow"></div>
     <div class="bg-grid"></div>
     <div class="smoke-clouds"></div>
@@ -32,6 +34,7 @@
         <span class="cell drift-a" style="--cell-x:3%; --cell-y:68%; --cell-size:34px; --cell-fill:rgba(238,64,221,0.94); --cell-hi:rgba(255,191,241,0.76); --cell-ring:rgba(118,14,109,0.9); --cell-glow:rgba(238,64,221,0.2); --cell-alpha:0.9; --cell-alpha-hi:0.98; --duration:22s; --pulse:9s; --delay:-12s;"></span>
         <span class="cell ghost drift-c" style="--cell-x:96%; --cell-y:78%; --cell-size:64px; --cell-fill:rgba(109,208,255,0.16); --cell-alpha:0.18; --cell-alpha-hi:0.24; --cell-blur:4px; --duration:30s; --pulse:15s; --delay:-6s;"></span>
     </div>
+    <div class="brawler-vignette"></div>
     
     <div class="lobby">
         <div class="logo">BLOBSTARS</div>
@@ -73,16 +76,13 @@
         <div class="bottom-dock">
             <div class="nav-item" data-modal="inventory" onclick="openModal('inventory')"><i class="fa-solid fa-box-open" style="color: #00e5ff;"></i><span>ASSETS</span></div>
             <div class="nav-item" data-modal="market" onclick="openModal('market')"><i class="fa-solid fa-store" style="color: #ffaa00;"></i><span>MARKET</span></div>
-            <div class="nav-item active" data-modal="home" onclick="closeModal()"><div class="mini-blob-mascot"></div><span>BLOBSTARS</span></div>
+            <div class="nav-item active nav-home" data-modal="home" onclick="closeModal()"><div class="dock-game-icon" aria-hidden="true"><i class="fa-solid fa-gamepad"></i></div><span>BLOBSTARS</span></div>
             <div class="nav-item" data-modal="ranking" onclick="openModal('ranking')"><i class="fa-solid fa-ranking-star" style="color: gold;"></i><span>LADDER</span></div>
             <div class="nav-item" data-modal="tasks" onclick="openModal('tasks')"><i class="fa-solid fa-clipboard-list" style="color: #39ff14;"></i><span>TASKS</span></div>
         </div>
         
         <div class="side-rail desktop-only">
             <div class="rail-item" onclick="openModal('daily')"><i class="fa-solid fa-gift"></i><div class="rail-badge">1</div></div>
-            <div class="rail-item" onclick="openModal('invite')"><i class="fa-solid fa-user-group"></i></div>
-            <div class="rail-item" onclick="openModal('ranking')"><i class="fa-solid fa-ranking-star"></i></div>
-            <div class="rail-item" onclick="openModal('tasks')"><i class="fa-solid fa-calendar-check"></i></div>
         </div>
     </div>
 
@@ -105,6 +105,8 @@
             <!-- Content injected via JS -->
         </div>
     </div>
-<script src="/js/blobstars-lobby.js?v=7"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/js/blobz-api.js?v=1"></script>
+    <script src="/js/blobstars-lobby.js?v=16"></script>
 </body>
 </html>
